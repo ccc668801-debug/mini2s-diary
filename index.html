@@ -1,4 +1,4 @@
-    <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
@@ -74,12 +74,15 @@
         .grid-cell { position: relative; width: 100%; height: 100%; background: #1a1a1a; overflow: hidden; }
         .grid-cell-video { width: 100%; height: 100%; object-fit: cover; }
         
-        /* 四宮格浮動文字 */
         .cell-overlay-time-box {
-            position: absolute; top: 30px; left: 0; width: 100%; text-align: center; color: #ffffff; text-shadow: 0 2px 6px rgba(0,0,0,0.7); z-index: 10; pointer-events: none;
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100%; text-align: center; color: #ffffff;
+            text-shadow: 0 2px 8px rgba(0,0,0,0.85); z-index: 10; pointer-events: none;
         }
         .cell-time-title { font-family: 'Lexend', sans-serif; font-size: 20px; font-weight: 800; margin: 0; }
-        .cell-desc-title { font-size: 14px; font-weight: 700; margin-top: 1px; padding: 0 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .cell-desc-title { font-size: 15px; font-weight: 700; margin-top: 4px; padding: 0 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
         .cell-profile-badge {
             position: absolute; top: 8px; left: 8px; display: flex; align-items: center; gap: 4px;
@@ -98,19 +101,30 @@
         .range-control-group { background: rgba(255,255,255,0.1); padding: 8px; border-radius: 8px; margin-bottom: 8px; }
         .range-slider { width: 100%; margin: 4px 0; accent-color: #ff7675; }
 
-        /* 主導覽列四個分頁 */
+        /* 房間管理條目樣式 */
+        .manage-item-row {
+            display: flex; justify-content: space-between; align-items: center; 
+            padding: 10px; background: #f1f2f6; margin-bottom: 8px; border-radius: 12px;
+        }
+        .manage-item-info { font-size: 13px; font-weight: bold; }
+        .btn-danger-small {
+            background: #ff7675; color: white; padding: 6px 12px; font-size: 11px; 
+            border-radius: 8px; width: auto; box-shadow: none;
+        }
+        .btn-danger-small:hover { background: #e84118; }
+
+        /* 主導覽列五個分頁 */
         .navbar {
             position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 480px; height: 65px;
             background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); display: flex; justify-content: space-around; align-items: center;
             border-top: 1px solid #f1f2f6; border-radius: 20px 20px 0 0; z-index: 999;
         }
-        .nav-item { display: flex; flex-direction: column; align-items: center; justify-content: center; color: #a4b0be; cursor: pointer; font-size: 11px; font-weight: bold; width: 23%; }
+        .nav-item { display: flex; flex-direction: column; align-items: center; justify-content: center; color: #a4b0be; cursor: pointer; font-size: 11px; font-weight: bold; width: 19%; }
         .nav-item.active { color: #2f3542; }
 
         .tab-content { display: none; }
         .tab-content.active { display: block; }
         
-        /* 💥 徹底從畫面上隱藏 canvas 核心，消滅底部沒意義的大黑框 */
         #canvasStage { display: none !important; }
     </style>
 </head>
@@ -121,8 +135,7 @@
 
     <div class="room-members-bar">
         <div class="member-bar-title">🏡 目前房間成員：</div>
-        <div id="roomMembersList" style="display: flex; gap: 8px; align-items: center;">
-            </div>
+        <div id="roomMembersList" style="display: flex; gap: 8px; align-items: center;"></div>
     </div>
 
     <div class="date-selector-box">
@@ -149,7 +162,7 @@
 
             <label>房間代碼：</label>
             <input type="text" id="roomCode" value="ABC99" onchange="saveProfileAndJoin()">
-            <button onclick="switchTab(1)">進入世界日記空間 ➔</button>
+            <button onclick="switchTab(1)">進入房間 ➔</button>
         </div>
     </div>
 
@@ -182,7 +195,7 @@
             
             <div id="tweakControlPanel">
                 <div class="range-control-group">
-                    <label style="color:#fff; font-size:11px;">⏱️ 2秒精采起點: <span id="timeVal">0.0s</span></label>
+                    <label style="color:#fff; font-size:11px;"><span id="timeVal">0.0s</span></label>
                     <input type="range" id="timeOffsetSlider" class="range-slider" min="0" max="10" step="0.1" value="0" oninput="updateVideoCropPreview()">
                 </div>
                 <div class="range-control-group">
@@ -222,15 +235,44 @@
         <canvas id="canvasStage" width="540" height="960"></canvas>
     </div>
 
+    <div id="page5" class="tab-content">
+        <div class="card">
+            <h3>🏠 房間內部管理</h3>
+            <p style="font-size: 13px; color:#747d8c; text-align:center;">目前所在的房間：<strong id="manageRoomCodeDisplay" style="color:#2f3542;">-</strong></p>
+            
+            <div style="background: #f1f2f6; padding: 12px; margin-bottom: 15px; border-radius: 12px; border: 1px dashed #747d8c;">
+                <label style="margin-top:0; color:#2f3542;">🎨 更改全房「未上傳狀態」文字：</label>
+                <div style="font-size: 11px; color:#747d8c; margin-bottom: 6px;">目前房間預設顯示：<strong id="currentEmptyPlaceholderStatus" style="color:#ff7675; font-size:13px;">💤</strong></div>
+                <div style="display:flex; gap:8px;">
+                    <input type="text" id="customEmptyStatusInput" placeholder="例如: Zzz、👀、休息中" style="margin-bottom:0; padding:8px;">
+                    <button onclick="broadcastCustomEmptyStatus()" style="width:auto; padding:0 15px; background:#747d8c;">更換</button>
+                </div>
+            </div>
+
+            <label>👥 房內在線成員名單：</label>
+            <div id="manageMembersContainer" style="margin-bottom: 15px;"></div>
+
+            <button onclick="exitCurrentRoom()" style="background:#ff7675; margin-bottom: 25px;">🚪 退出房間</button>
+            
+            <hr style="border:0; border-top:1px solid #e4e7eb; margin-bottom:15px;">
+
+            <label>📸 我今天已發布的時段紀錄：</label>
+            <div id="myUploadsContainer"></div>
+        </div>
+    </div>
+
     <div class="navbar">
         <div class="nav-item active" id="nav1" onclick="switchTab(0)">🔑 設定</div>
         <div class="nav-item" id="nav2" onclick="switchTab(1)">🕒 發布日常</div>
         <div class="nav-item" id="nav3" onclick="switchTab(2)">👀 看看大家</div>
         <div class="nav-item" id="nav4" onclick="switchTab(3)">🎬 影片生成</div>
+        <div class="nav-item" id="nav5" onclick="switchTab(4)">🏠 房間管理</div>
     </div>
 
     <script>
         let socket; let userAvatarBase64 = ""; let currentRawVideoSrc = ""; let megaDB = {};
+        let globalCachedMembers = []; 
+        let globalEmptyPlaceholder = "💤"; // 💥 全域未上傳預設文字變數
         const fullDayHours = []; for(let i=0; i<24; i++) { fullDayHours.push((i < 10 ? '0' + i : i) + ':00'); }
 
         window.onload = function() {
@@ -241,18 +283,19 @@
             socket.on('connect', () => { saveProfileAndJoin(); });
 
             socket.on('room-members-update', (members) => {
-                const bar = document.getElementById("roomMembersList");
-                if(!bar) return;
-                bar.innerHTML = "";
-                members.slice(0, 4).forEach(m => {
-                    const defaultSvg = "data:image/svg+xml;utf8,<svg viewBox='0 0 24 24' fill='%23a4b0be'><path d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z'/></svg>";
-                    bar.innerHTML += `
-                        <div class="member-chip">
-                            <img class="member-chip-avatar" src="${m.avatar || defaultSvg}">
-                            <span class="member-chip-name">${m.userName || "未命名"}</span>
-                        </div>
-                    `;
-                });
+                globalCachedMembers = members;
+                renderRoomMembersUI(members);
+                renderManagementPageUI();
+            });
+
+            // 💥 監聽伺服器廣播來的全房未上傳狀態同步
+            socket.on('update-room-empty-status', (newStatus) => {
+                if(newStatus) {
+                    globalEmptyPlaceholder = newStatus;
+                    document.getElementById("currentEmptyPlaceholderStatus").innerText = newStatus;
+                    updateLivePublishGrid();
+                    refreshWatchGridUI();
+                }
             });
 
             socket.on('new-diary-broadcast', (data) => {
@@ -269,6 +312,7 @@
                 const activeTabId = document.querySelector('.nav-item.active').id;
                 if (activeTabId === "nav2") updateLivePublishGrid();
                 if (activeTabId === "nav3") refreshWatchGridUI();
+                if (activeTabId === "nav5") renderManagementPageUI();
             });
 
             if(localStorage.getItem("mini2s_userName")) document.getElementById("userName").value = localStorage.getItem("mini2s_userName");
@@ -280,6 +324,7 @@
             }
             megaDB = localStorage.getItem("mini2s_megaDB") ? JSON.parse(localStorage.getItem("mini2s_megaDB")) : {};
             
+            saveProfileAndJoin();
             updateLivePublishGrid();
             syncInputText();
         };
@@ -307,6 +352,143 @@
             const userSet = new Set([myName]);
             if(dateDB[hour]) { Object.keys(dateDB[hour]).forEach(u => userSet.add(u)); }
             return Array.from(userSet).slice(0, 4);
+        }
+
+        function renderRoomMembersUI(serverMembers) {
+            const bar = document.getElementById("roomMembersList");
+            if(!bar) return;
+            bar.innerHTML = "";
+            
+            const myName = document.getElementById("userName").value || "未命名";
+            let listToShow = [];
+            
+            if (serverMembers && serverMembers.length > 0) {
+                let hasMe = serverMembers.some(m => m.userName === myName);
+                if (!hasMe) {
+                    listToShow.push({ userName: myName, avatar: userAvatarBase64 });
+                }
+                serverMembers.forEach(m => listToShow.push(m));
+            } else {
+                listToShow.push({ userName: myName, avatar: userAvatarBase64 });
+            }
+
+            const uniqueList = [];
+            const seen = new Set();
+            listToShow.forEach(item => {
+                if (!seen.has(item.userName)) {
+                    seen.add(item.userName);
+                    uniqueList.push(item);
+                }
+            });
+
+            uniqueList.slice(0, 4).forEach(m => {
+                const defaultSvg = "data:image/svg+xml;utf8,<svg viewBox='0 0 24 24' fill='%23a4b0be'><path d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z'/></svg>";
+                bar.innerHTML += `
+                    <div class="member-chip">
+                        <img class="member-chip-avatar" src="${m.avatar || defaultSvg}">
+                        <span class="member-chip-name">${m.userName}</span>
+                    </div>
+                `;
+            });
+        }
+
+        // 💥 按下「更換」時，將客製化未上傳符號/文字發送到伺服器
+        function broadcastCustomEmptyStatus() {
+            const inputVal = document.getElementById("customEmptyStatusInput").value.trim();
+            if(!inputVal) return alert("請輸入想要變更的未上傳文字或表情符號唷！🎨");
+            const rCode = document.getElementById("roomCode").value;
+            
+            // 透過 Socket.io 發出特定自訂狀態更新事件
+            if(socket && socket.connected) {
+                socket.emit('change-room-empty-status', { roomCode: rCode, statusText: inputVal });
+                document.getElementById("customEmptyStatusInput").value = "";
+            } else {
+                // 單機備用fallback
+                globalEmptyPlaceholder = inputVal;
+                document.getElementById("currentEmptyPlaceholderStatus").innerText = inputVal;
+                updateLivePublishGrid();
+                refreshWatchGridUI();
+            }
+        }
+
+        function renderManagementPageUI() {
+            const rCode = document.getElementById("roomCode").value;
+            document.getElementById("manageRoomCodeDisplay").innerText = rCode;
+            document.getElementById("currentEmptyPlaceholderStatus").innerText = globalEmptyPlaceholder;
+
+            const membersContainer = document.getElementById("manageMembersContainer");
+            if(membersContainer) {
+                membersContainer.innerHTML = "";
+                const myName = document.getElementById("userName").value || "未命名";
+                let currentList = globalCachedMembers.length > 0 ? globalCachedMembers : [{ userName: myName, avatar: userAvatarBase64 }];
+                
+                currentList.forEach(m => {
+                    membersContainer.innerHTML += `
+                        <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px; background:#fff; padding:8px; border:1px solid #e4e7eb;">
+                            <img src="${m.avatar || 'data:image/svg+xml;utf8,<svg viewBox=\'0 0 24 24\' fill=\'%23a4b0be\'><path d=\'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z\'/></svg>'}" style="width:24px; height:24px; border-radius:50%; object-fit:cover;">
+                            <span style="font-size:13px; font-weight:bold;">${m.userName} ${m.userName === myName ? '(你)' : ''}</span>
+                        </div>
+                    `;
+                });
+            }
+
+            const uploadsContainer = document.getElementById("myUploadsContainer");
+            if(uploadsContainer) {
+                uploadsContainer.innerHTML = "";
+                const dateDB = getActiveDateDB();
+                const myName = document.getElementById("userName").value || "未命名";
+                let hasRecords = false;
+
+                fullDayHours.forEach(h => {
+                    if(dateDB[h] && dateDB[h][myName] && dateDB[h][myName].video) {
+                        hasRecords = true;
+                        uploadsContainer.innerHTML += `
+                            <div class="manage-item-row">
+                                <div class="manage-item-info">⏰ 時段 ${h} ➔ <span style="color:#747d8c;">"${dateDB[h][myName].text}"</span></div>
+                                <button class="btn-danger-small" onclick="deleteMyDiaryRecord('${h}')">🗑️ 刪除紀錄</button>
+                            </div>
+                        `;
+                    }
+                });
+
+                if(!hasRecords) {
+                    uploadsContainer.innerHTML = `<p style="font-size:12px; color:#a4b0be; text-align:center;">目前這個日期你還沒有發布任何日常動態唷！${globalEmptyPlaceholder}</p>`;
+                }
+            }
+        }
+
+        function deleteMyDiaryRecord(hour) {
+            if(!confirm(`確定要刪除 ${hour} 時段的動態影片嗎？`)) return;
+            const date = document.getElementById('diaryDate').value;
+            const myName = document.getElementById("userName").value || "未命名";
+            const dateDB = getActiveDateDB();
+
+            if(dateDB[hour] && dateDB[hour][myName]) {
+                delete dateDB[hour][myName];
+                localStorage.setItem("mini2s_megaDB", JSON.stringify(megaDB));
+                
+                if(socket && socket.connected) {
+                    const rCode = document.getElementById("roomCode").value;
+                    socket.emit('share-diary', {
+                        roomCode: rCode, userName: myName, date: date, hour: hour,
+                        text: "", avatar: "", video: "", timeStart: 0, yAlign: 50, region: ""
+                    });
+                }
+                alert("已成功刪除該時段影片！");
+                renderManagementPageUI();
+                updateLivePublishGrid();
+            }
+        }
+
+        function exitCurrentRoom() {
+            if(!confirm("確定要退出目前房間嗎？")) return;
+            document.getElementById("roomCode").value = "";
+            localStorage.setItem("mini2s_roomCode", "");
+            if(socket && socket.connected) {
+                socket.emit('join-room-with-profile', { roomCode: "", userName: "", avatar: "" });
+            }
+            alert("已退出房間");
+            switchTab(0);
         }
 
         function updateLivePublishGrid() {
@@ -340,9 +522,11 @@
                             <video class="grid-cell-video" id="liveEditVideoRef" loop muted playsinline src="${currentRawVideoSrc}"></video>
                         `;
                     } else {
+                        // 💥 帶入連線同步後的預設符號變數
                         cell.innerHTML = `
                             <div class="cell-empty-placeholder">
                                 <div class="cell-empty-time">${hour}</div>
+                                <span style="font-size:24px; margin-bottom:5px;">${globalEmptyPlaceholder}</span>
                                 <span style="font-size:11px; font-weight:bold;">👉 點上方添加影片</span>
                             </div>
                         `;
@@ -361,10 +545,11 @@
                         <video class="grid-cell-video" loop autoplay muted playsinline src="${uData.video}" style="object-position: center ${uData.yAlign}%;"></video>
                     `;
                 } else {
+                    // 💥 帶入連線同步後的預設符號變數
                     cell.innerHTML = `
                         <div class="cell-empty-placeholder">
                             <div class="cell-empty-time">${hour}</div>
-                            <span>💤</span>
+                            <span style="font-size:24px;">${globalEmptyPlaceholder}</span>
                         </div>
                     `;
                 }
@@ -391,7 +576,7 @@
                 document.getElementById("tweakControlPanel").style.display = "block";
                 document.getElementById("timeOffsetSlider").value = 0;
                 document.getElementById("vOffsetSlider").value = 50;
-                document.getElementById('timerStatus').innerText = "✨ 請調整精采起點與畫面中心！";
+                document.getElementById('timerStatus').innerText = "✨ 請調整畫面中心！";
                 updateLivePublishGrid();
             };
             reader.readAsDataURL(file);
@@ -437,7 +622,7 @@
                 });
             }
 
-            alert("🎉 新增完成！");
+            alert("生成成功");
             clearPublishPage();
         }
 
@@ -479,10 +664,11 @@
                         <video class="grid-cell-video" loop autoplay muted playsinline src="${uData.video}" style="object-position: center ${uData.yAlign}%;"></video>
                     `;
                 } else {
+                    // 💥 帶入連線同步後的預設符號變數
                     cell.innerHTML = `
                         <div class="cell-empty-placeholder">
                             <div class="cell-empty-time">${hour}</div>
-                            <span>💤</span>
+                            <span style="font-size:24px;">${globalEmptyPlaceholder}</span>
                         </div>
                     `;
                 }
@@ -498,6 +684,8 @@
             localStorage.setItem("mini2s_roomCode", rCode);
             localStorage.setItem("mini2s_userRegion", reg);
             
+            renderRoomMembersUI([]); 
+            
             if(socket && socket.connected) {
                 socket.emit('join-room-with-profile', { roomCode: rCode, userName: uName, avatar: userAvatarBase64 });
             }
@@ -508,6 +696,7 @@
             const activeTabId = document.querySelector('.nav-item.active').id;
             if (activeTabId === "nav2") updateLivePublishGrid();
             if (activeTabId === "nav3") refreshWatchGridUI();
+            if (activeTabId === "nav5") renderManagementPageUI();
         }
         
         function syncInputText() { const hour = document.getElementById('currentHour').value; const uName = document.getElementById("userName").value || "未命名"; const dateDB = getActiveDateDB(); document.getElementById('statusText').value = (dateDB[hour] && dateDB[hour][uName]) ? dateDB[hour][uName].text : ""; }
@@ -519,9 +708,9 @@
             document.querySelectorAll('.nav-item')[tabIndex].classList.add('active'); 
             if(tabIndex === 1) updateLivePublishGrid();
             if(tabIndex === 2) refreshWatchGridUI(); 
+            if(tabIndex === 4) renderManagementPageUI(); 
         }
 
-        // 💥 重磅修正：100% 複製預覽、完美消滅黑邊的 Canvas 渲染器
         async function renderMegaFullDayVideo() {
             const canvas = document.getElementById('canvasStage'); const ctx = canvas.getContext('2d');
             const outputArea = document.getElementById('megaOutputArea'); 
@@ -535,7 +724,7 @@
                 return; 
             }
 
-            outputArea.innerHTML = `<p style='color:#747d8c;'>⏳ 正在將全天時段串聯融合成終極大片，請稍候...</p>`;
+            outputArea.innerHTML = `<p style='color:#747d8c; font-weight:bold;'>生成中</p>`;
 
             const stream = canvas.captureStream(24);
             const recorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
@@ -588,30 +777,27 @@
                         if (uData && uData.video && vElements[u] && vElements[u].videoWidth > 0) {
                             const video = vElements[u];
                             
-                            // 💥 核心 Cover 演算法：完美計算影片縮放，徹底消滅黑邊
                             let vWidth = video.videoWidth;
                             let vHeight = video.videoHeight;
                             let scale = Math.max(cellW / vWidth, cellH / vHeight);
                             let drawW = vWidth * scale;
                             let drawH = vHeight * scale;
                             
-                            // 計算置中與滑桿平移位置 (yAlign)
                             let drawX = coord.x + (cellW - drawW) / 2;
                             let yPercent = (uData.yAlign || 50) / 100;
-                            let drawY = coord.y + (cellH - drawH) * yPercent; // 根據滑桿位置百分比精準平移
+                            let drawY = coord.y + (cellH - drawH) * yPercent;
                             
                             ctx.drawImage(video, drawX, drawY, drawW, drawH);
                             
-                            // 遮罩與文字渲染
                             ctx.fillStyle = "rgba(0, 0, 0, 0.12)"; ctx.fillRect(coord.x, coord.y, cellW, cellH);
                             ctx.fillStyle = "#ffffff"; ctx.textAlign = "center";
                             ctx.shadowColor = "rgba(0,0,0,0.6)"; ctx.shadowBlur = 8;
                             
                             ctx.font = "800 32px 'Lexend', sans-serif";
-                            ctx.fillText(h, coord.x + cellW / 2, coord.y + 65);
+                            ctx.fillText(h, coord.x + cellW / 2, coord.y + (cellH / 2) - 10);
                             
                             ctx.font = "bold 20px sans-serif";
-                            ctx.fillText(uData.text, coord.x + cellW / 2, coord.y + 105);
+                            ctx.fillText(uData.text, coord.x + cellW / 2, coord.y + (cellH / 2) + 30);
                             ctx.shadowBlur = 0;
 
                             const regionDisplay = uData.region || "";
@@ -634,8 +820,10 @@
                             ctx.fillStyle = '#121212'; ctx.fillRect(coord.x, coord.y, cellW, cellH);
                             ctx.fillStyle = 'rgba(255,255,255,0.2)';
                             ctx.textAlign = "center";
-                            ctx.font = "800 30px 'Lexend', sans-serif"; ctx.fillText(h, coord.x + cellW / 2, coord.y + 65);
-                            ctx.font = "30px sans-serif"; ctx.fillText("💤", coord.x + cellW / 2, coord.y + 115);
+                            ctx.font = "800 30px 'Lexend', sans-serif"; ctx.fillText(h, coord.x + cellW / 2, coord.y + (cellH / 2) - 15);
+                            
+                            // 💥 生成全天大片時，未上傳格子也完美改用連線自訂狀態文字
+                            ctx.font = "30px sans-serif"; ctx.fillText(globalEmptyPlaceholder, coord.x + cellW / 2, coord.y + (cellH / 2) + 25);
                         }
                         ctx.restore();
                     }
@@ -646,5 +834,7 @@
             recorder.stop();
         }
     </script>
+    </body>
+</html>
 </body>
 </html>
