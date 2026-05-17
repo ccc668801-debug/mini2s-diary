@@ -112,10 +112,6 @@ document.write(`<option value="${h}" ${i===10?'selected':''}>${h}</option>`);
 <div class="quad-grid-stage" id="publishQuadGrid"></div>
 <div id="tweakControlPanel">
 <div class="range-control-group">
-<label style="color:#fff;font-size:11px;"><span id="timeVal">0.0s</span></label>
-<input type="range" id="timeOffsetSlider" class="range-slider" min="0" max="10" step="0.1" value="0" oninput="updateVideoCropPreview()">
-</div>
-<div class="range-control-group">
 <label style="color:#fff;font-size:11px;">↕️ 畫面上下移動置中: <span id="yVal">50%</span></label>
 <input type="range" id="vOffsetSlider" class="range-slider" min="0" max="100" value="50" oninput="updateVideoCropPreview()">
 </div>
@@ -348,15 +344,14 @@ if(currentRawVideoSrc){const editVid=document.getElementById("liveEditVideoRef")
 function prepareVideoEditor(input){
 const file=input.files[0];if(!file)return;
 document.getElementById('timerStatus').innerText="⏳ 載入影片中...";const reader=new FileReader();
-reader.onload=function(e){currentRawVideoSrc=e.target.result;document.getElementById("tweakControlPanel").style.display="block";document.getElementById("timeOffsetSlider").value=0;document.getElementById("vOffsetSlider").value=50;document.getElementById('timerStatus').innerText="✨ 請調整畫面中心！";updateLivePublishGrid();};
+reader.onload=function(e){currentRawVideoSrc=e.target.result;document.getElementById("tweakControlPanel").style.display="block";document.getElementById("vOffsetSlider").value=50;document.getElementById('timerStatus').innerText="✨ 請調整畫面中心！";updateLivePublishGrid();};
 reader.readAsDataURL(file);
 }
 function updateVideoCropPreview(){
 const videoEl=document.getElementById("liveEditVideoRef");if(!videoEl)return;
-const timeStart=parseFloat(document.getElementById("timeOffsetSlider").value);const yAlign=document.getElementById("vOffsetSlider").value;
-document.getElementById("timeVal").innerText=timeStart.toFixed(1)+"s";document.getElementById("yVal").innerText=yAlign+"%";
-if(videoEl.duration){document.getElementById("timeOffsetSlider").max=Math.max(0,videoEl.duration-2);}
-videoEl.currentTime=timeStart;videoEl.style.objectPosition=`center ${yAlign}%`;
+const yAlign=document.getElementById("vOffsetSlider").value;
+document.getElementById("yVal").innerText=yAlign+"%";
+videoEl.style.objectPosition=`center ${yAlign}%`;
 }
 function submitDiaryToServer(){
 const textInput=document.getElementById('statusText').value;if(!textInput||!currentRawVideoSrc)return alert("請填寫狀態並選擇影片唷！🎬");
@@ -364,10 +359,10 @@ const date=document.getElementById('diaryDate').value;const hour=document.getEle
 const activeRoom=document.getElementById("activeRoomSelect").value;const reg=document.getElementById("userRegion").value;
 if(!activeRoom)return alert("你目前沒有在任何房間中！");const dateDB=getActiveDateDB();
 if(!dateDB[hour][activeRoom])dateDB[hour][activeRoom]={};
-dateDB[hour][activeRoom][uName]={text:textInput,avatar:userAvatarBase64,video:currentRawVideoSrc,timeStart:parseFloat(document.getElementById("timeOffsetSlider").value),yAlign:parseInt(document.getElementById("vOffsetSlider").value),region:reg};
+dateDB[hour][activeRoom][uName]={text:textInput,avatar:userAvatarBase64,video:currentRawVideoSrc,timeStart:0,yAlign:parseInt(document.getElementById("vOffsetSlider").value),region:reg};
 localStorage.setItem("mini2s_megaDB",JSON.stringify(megaDB));
-if(socket&&socket.connected){socket.emit('share-diary',{roomCode:activeRoom,userName:uName,date:date,hour:hour,text:textInput,avatar:userAvatarBase64,video:currentRawVideoSrc,timeStart:dateDB[hour][activeRoom][uName].timeStart,yAlign:dateDB[hour][activeRoom][uName].yAlign,region:reg});}
-alert("生成成功");clearPublishPage();
+if(socket&&socket.connected){socket.emit('share-diary',{roomCode:activeRoom,userName:uName,date:date,hour:hour,text:textInput,avatar:userAvatarBase64,video:currentRawVideoSrc,timeStart:0,yAlign:dateDB[hour][activeRoom][uName].yAlign,region:reg});}
+alert("新增完成！🎉");clearPublishPage();
 }
 function clearPublishPage(){
 document.getElementById('statusText').value="";document.getElementById("tweakControlPanel").style.display="none";document.getElementById('timerStatus').innerText="";
@@ -431,7 +426,7 @@ for(let h of activeHours){
 const vElements={};
 for(let u of userList){
 if(dateDB[h]&&dateDB[h][rCode]&&dateDB[h][rCode][u]&&dateDB[h][rCode][u].video){
-const v=document.createElement('video');v.src=dateDB[h][rCode][u].video;v.muted=true;v.playsInline=true;v.currentTime=dateDB[h][rCode][u].timeStart||0;v.play();vElements[u]=v;
+const v=document.createElement('video');v.src=dateDB[h][rCode][u].video;v.muted=true;v.playsInline=true;v.currentTime=0;v.play();vElements[u]=v;
 }
 }
 let startRun=Date.now();
@@ -463,7 +458,5 @@ for(let u in vElements){vElements[u].pause();vElements[u].src="";vElements[u].lo
 recorder.stop();
 }
 </script>
-    </body>
-</html>
 </body>
 </html>
