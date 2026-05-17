@@ -6,7 +6,7 @@
     <title>🌸 Mini2s - 多人雲端連線日記</title>
     <script src="/socket.io/socket.io.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght=400;700&display=swap');
         
         * {
             font-family: 'Noto Sans TC', 'Microsoft JhengHei', sans-serif;
@@ -34,7 +34,20 @@
             text-align: center;
         }
         .date-selector-box label { display: inline; color: #ff7675; font-size: 15px; font-weight: bold; }
-        .date-selector-box select { width: auto; display: inline-block; padding: 6px 12px; margin-left: 8px; border: 2px solid #ff7675; background: #fff; font-weight: bold; color: #ff7675; }
+        
+        .date-picker-input {
+            width: auto;
+            display: inline-block;
+            padding: 6px 12px;
+            margin-left: 8px;
+            border: 2px solid #ff7675;
+            background: #fff;
+            font-weight: bold;
+            color: #ff7675;
+            font-size: 14px;
+            outline: none;
+            cursor: pointer;
+        }
 
         .card {
             background: #ffffff;
@@ -54,6 +67,31 @@
         }
         button:hover { background: #ff7979; }
         button:disabled { background: #ced6e0; box-shadow: none; cursor: not-allowed; }
+
+        /* 雙按鈕並排樣式 */
+        .upload-options-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .upload-opt-btn {
+            flex: 1;
+            padding: 15px 10px;
+            font-size: 14px;
+            text-align: center;
+            font-weight: bold;
+            cursor: pointer;
+            border: 2px solid #f1f2f6;
+            background: #fff;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        .upload-opt-btn .btn-icon { font-size: 24px; }
+        .upload-opt-btn:active { background: #fff0f0; border-color: #ff7675; }
 
         .avatar-uploader {
             display: flex; flex-direction: column; align-items: center; margin: 15px 0; gap: 10px;
@@ -102,20 +140,14 @@
 <body>
 
     <h1>🌸 Mini2s</h1>
-    <p class="subtitle">24H 免費雲端連線版</p>
+    <p class="subtitle">365天全天候連線日記版</p>
     <div id="connStatus">🟡 連線中...</div>
 
     <div class="date-selector-box">
         <label>📅 選擇日記日期：</label>
-        <select id="diaryDate" onchange="handleDateChange()">
-            <option value="2026-05-19">5月19日 (二)</option>
-            <option value="2026-05-20">5月20日 (三)</option>
-            <option value="2026-05-21" selected>5月21日 (四)</option>
-            <option value="2026-05-22">5月22日 (五)</option>
-        </select>
+        <input type="date" id="diaryDate" class="date-picker-input" onchange="handleDateChange()">
     </div>
 
-    <!-- 第一頁：房間個人設定 -->
     <div id="page1" class="tab-content active">
         <div class="card">
             <h3>🔑 設定個人與房間</h3>
@@ -139,24 +171,43 @@
         </div>
     </div>
 
-    <!-- 第二頁：選擇螢幕錄影/現成影片與上傳 -->
     <div id="page2" class="tab-content">
         <div class="card">
-            <h3>🕒 上傳螢幕錄影或日常短片</h3>
+            <h3>🕒 記錄這一刻的日常</h3>
             
             <label>選擇目前時段：</label>
             <select id="currentHour" onchange="syncInputText()">
-                <option value="09:00">09:00</option>
-                <option value="10:00">10:00</option>
-                <option value="11:00">11:00</option>
+                <option value="00:00">00:00</option><option value="01:00">01:00</option>
+                <option value="02:00">02:00</option><option value="03:00">03:00</option>
+                <option value="04:00">04:00</option><option value="05:00">05:00</option>
+                <option value="06:00">06:00</option><option value="07:00">07:00</option>
+                <option value="08:00">08:00</option><option value="09:00" selected>09:00</option>
+                <option value="10:00">10:00</option><option value="11:00">11:00</option>
+                <option value="12:00">12:00</option><option value="13:00">13:00</option>
+                <option value="14:00">14:00</option><option value="15:00">15:00</option>
+                <option value="16:00">16:00</option><option value="17:00">17:00</option>
+                <option value="18:00">18:00</option><option value="19:00">19:00</option>
+                <option value="20:00">20:00</option><option value="21:00">21:00</option>
+                <option value="22:00">22:00</option><option value="23:00">23:00</option>
             </select>
             
             <label>寫下當下的心情 / 在幹嘛：</label>
-            <input type="text" id="statusText" placeholder="例如：在玩遊戲、看好看的影片...">
+            <input type="text" id="statusText" placeholder="例如：在吃點心、看好看的影片...">
             
-            <label>選擇你的影片檔案（支援螢幕錄影）：</label>
-            <button onclick="document.getElementById('diaryVideoInput').click()" style="background:#55efc4; box-shadow: 0 4px 12px rgba(85, 239, 196, 0.25); margin-bottom: 10px;">📱 從手機相簿選取影片</button>
-            <input type="file" id="diaryVideoInput" accept="video/*" style="display: none;" onchange="handleDiaryVideo(this)">
+            <label>添加你的生活影片：</label>
+            <div class="upload-options-group">
+                <div class="upload-opt-btn" onclick="document.getElementById('cameraVideoInput').click()">
+                    <span class="btn-icon">📸</span>
+                    <span>直接拍攝短片</span>
+                </div>
+                <div class="upload-opt-btn" onclick="document.getElementById('fileVideoInput').click()">
+                    <span class="btn-icon">📁</span>
+                    <span>從相簿選取檔案</span>
+                </div>
+            </div>
+
+            <input type="file" id="cameraVideoInput" accept="video/*" capture="camera" style="display: none;" onchange="handleDiaryVideo(this)">
+            <input type="file" id="fileVideoInput" accept="video/*" style="display: none;" onchange="handleDiaryVideo(this)">
 
             <div id="videoPreviewBox">
                 <p style="font-size: 13px; color: #ff7675; font-weight: bold;">🎬 影片已就緒：</p>
@@ -168,7 +219,6 @@
         </div>
     </div>
 
-    <!-- 第三頁：查看好友狀態/影片合成 -->
     <div id="page3" class="tab-content">
         <div class="card">
             <h3>👀 房間內好友即時狀態</h3>
@@ -203,7 +253,18 @@
         let currentSelectedVideoBase64 = ""; 
         let megaDB = {}; 
 
+        const fullDayHours = [];
+        for(let i=0; i<24; i++) {
+            fullDayHours.push((i < 10 ? '0' + i : i) + ':00');
+        }
+
         window.onload = function() {
+            const today = new Date();
+            const yyyy = today.getFullYear();
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            const dd = String(today.getDate()).padStart(2, '0');
+            document.getElementById('diaryDate').value = `${yyyy}-${mm}-${dd}`;
+
             socket = io();
 
             socket.on('connect', () => {
@@ -222,7 +283,7 @@
                 const h = data.hour;
                 const u = data.userName;
 
-                if (!megaDB[d]) megaDB[d] = {};
+                if (!megaDB[d]) megaDB[d] = initDateHours();
                 if (!megaDB[d][h]) megaDB[d][h] = {};
 
                 megaDB[d][h][u] = {
@@ -245,6 +306,12 @@
             megaDB = localStorage.getItem("mini2s_megaDB") ? JSON.parse(localStorage.getItem("mini2s_megaDB")) : {};
             syncInputText();
         };
+
+        function initDateHours() {
+            let obj = {};
+            fullDayHours.forEach(h => obj[h] = {});
+            return obj;
+        }
 
         function triggerAvatarUpload() { document.getElementById("avatarFileInput").click(); }
 
@@ -272,7 +339,7 @@
         function handleDiaryVideo(input) {
             const file = input.files[0];
             if (!file) return;
-            if (file.size > 25 * 1024 * 1024) alert("這個影片有點大（超過25MB），建議上傳短一點的螢幕錄影或日常短片唷！🌸");
+            if (file.size > 25 * 1024 * 1024) alert("這個影片有點大（超過25MB），建議上傳短一點的精采片段唷！🌸");
 
             const reader = new FileReader();
             document.getElementById('timerStatus').innerText = "⏳ 正在處理影片中...";
@@ -288,7 +355,7 @@
         function submitDiaryToServer() {
             const textInput = document.getElementById('statusText').value;
             if(!textInput) return alert("要先寫下現在在做什麼或心情唷！🌸");
-            if(!currentSelectedVideoBase64) return alert("請先選取一段螢幕錄影或短片唷！🎬");
+            if(!currentSelectedVideoBase64) return alert("請先拍攝短片或選取檔案唷！🎬");
 
             const date = document.getElementById('diaryDate').value;
             const hour = document.getElementById('currentHour').value;
@@ -311,7 +378,8 @@
             document.getElementById('timerStatus').innerText = "🚀 發布並即時同步成功！";
             document.getElementById("videoPreviewBox").style.display = "none";
             currentSelectedVideoBase64 = "";
-            document.getElementById('diaryVideoInput').value = "";
+            document.getElementById('cameraVideoInput').value = "";
+            document.getElementById('fileVideoInput').value = "";
         }
 
         function saveProfileAndJoin() {
@@ -331,7 +399,9 @@
 
         function getActiveDateDB() {
             const date = document.getElementById('diaryDate').value;
-            if(!megaDB[date]) megaDB[date] = { "09:00": {}, "10:00": {}, "11:00": {} };
+            if(!megaDB[date]) {
+                megaDB[date] = initDateHours();
+            }
             return megaDB[date];
         }
 
@@ -359,7 +429,7 @@
             
             hours.forEach((hour, index) => {
                 const tag = document.createElement('div');
-                tag.className = 'time-tag' + (index === 0 ? ' active' : '');
+                tag.className = 'time-tag' + (index === 9 ? ' active' : ''); 
                 tag.innerText = hour;
                 tag.onclick = () => {
                     document.querySelectorAll('.time-tag').forEach(t => t.classList.remove('active'));
@@ -368,7 +438,7 @@
                 };
                 container.appendChild(tag);
             });
-            if(hours.length > 0) showHourDetails(hours[0]);
+            showHourDetails("09:00");
         }
 
         function showHourDetails(hour) {
@@ -382,7 +452,7 @@
 
             allUsersInHour.forEach(user => {
                 const data = dateDB[hour] ? dateDB[hour][user] : null;
-                if(data) {
+                if(data && data.text) {
                     const isMe = user === "你";
                     const imgSrc = data.avatar || defaultSvg;
                     let videoHtml = data.video ? `<video class="diary-video" src="${data.video}" controls muted playsinline></video>` : "";
@@ -401,12 +471,12 @@
                         </div>`;
                 } else {
                     area.innerHTML += `
-                        <div class="friend-row" style="opacity: 0.5;">
+                        <div class="friend-row" style="opacity: 0.4;">
                             <div class="friend-header">
                                 <img class="friend-avatar-img" src="${defaultSvg}">
                                 <div class="friend-info">
                                     <div class="friend-name">${user}</div>
-                                    <div class="friend-status">這個小時還沒動靜...</div>
+                                    <div class="friend-status">這個小時還沒動靜...💤</div>
                                 </div>
                             </div>
                         </div>`;
@@ -419,8 +489,19 @@
             const ctx = canvas.getContext('2d');
             const outputArea = document.getElementById('outputArea');
             const targetDate = document.getElementById('diaryDate').value;
+            
+            const dateDB = getActiveDateDB();
+            const activeHours = Object.keys(dateDB).filter(h => {
+                return Object.keys(dateDB[h]).some(user => dateDB[h][user] && dateDB[h][user].video);
+            }).sort();
+
+            if(activeHours.length === 0) {
+                outputArea.innerHTML = `<p style='color:#ff7675; font-size:14px; font-weight:bold;'>❌ 今天目前還沒有任何人上傳影片唷！快去傳一段吧！🌸</p>`;
+                return;
+            }
+
             canvas.style.display = 'block';
-            outputArea.innerHTML = `<p style='color:#ff9f43; font-size:14px;'>⏳ 正在合成 ${targetDate} 螢幕錄影大合體中...</p>`;
+            outputArea.innerHTML = `<p style='color:#ff9f43; font-size:14px;'>⏳ 正在合成 ${targetDate} 的影片大合體中...</p>`;
 
             const canvasStream = canvas.captureStream(15);
             const finalRecorder = new MediaRecorder(canvasStream, { mimeType: 'video/webm' });
@@ -431,24 +512,22 @@
                 const finalBlob = new Blob(finalChunks, { type: 'video/mp4' });
                 const finalFileUrl = URL.createObjectURL(finalBlob);
                 outputArea.innerHTML = `
-                    <p style="color:#2ed573; font-weight:bold; font-size:14px;">🎉 多人螢幕錄影合體日記生成完畢！</p>
+                    <p style="color:#2ed573; font-weight:bold; font-size:14px;">🎉 多人縮時合體日記生成完畢！</p>
                     <video src="${finalFileUrl}" controls autoplay style="width:100%; display:block; margin:10px auto; border-radius:16px;"></video>
-                    <a href="${finalFileUrl}" download="${targetDate}_合體紀錄日記.mp4" style="color:#ff7675; text-decoration:none; font-weight:bold; display:inline-block; margin-top:5px; font-size:15px;">📥 下載今日合體 MP4</a>`;
+                    <a href="${finalFileUrl}" download="${targetDate}_合體日記.mp4" style="color:#ff7675; text-decoration:none; font-weight:bold; display:inline-block; margin-top:5px; font-size:15px;">📥 下載今日精采合體 MP4</a>`;
             };
 
             finalRecorder.start();
-            const dateDB = getActiveDateDB();
-            const hours = Object.keys(dateDB).sort();
 
             const userSet = new Set(["你"]);
-            hours.forEach(h => { Object.keys(dateDB[h]).forEach(u => userSet.add(u)); });
+            activeHours.forEach(h => { Object.keys(dateDB[h]).forEach(u => userSet.add(u)); });
             const usersList = Array.from(userSet).slice(0, 3); 
 
             const loadedImages = {};
             const defaultSvg = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23a4b0be'><path d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z'/></svg>";
             for (let user of usersList) {
                 let src = defaultSvg;
-                for (let h of hours) {
+                for (let h of activeHours) {
                     if (dateDB[h] && dateDB[h][user] && dateDB[h][user].avatar) { src = dateDB[h][user].avatar; break; }
                 }
                 const img = new Image(); img.src = src;
@@ -456,7 +535,7 @@
                 loadedImages[user] = img;
             }
 
-            for (let h of hours) {
+            for (let h of activeHours) {
                 const videoElements = {};
                 for (let user of usersList) {
                     if (dateDB[h] && dateDB[h][user] && dateDB[h][user].video) {
@@ -470,14 +549,14 @@
                 let startTime = Date.now();
                 while (Date.now() - startTime < 2000) {
                     ctx.fillStyle = '#f7f9fa'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-                    ctx.fillStyle = '#ff7675'; ctx.font = 'bold 16px sans-serif'; ctx.fillText(`📅 時段：${h}`, 15, 30);
+                    ctx.fillStyle = '#ff7675'; ctx.font = 'bold 16px sans-serif'; ctx.fillText(`📅 日期：${targetDate} 時段：${h}`, 15, 30);
 
                     for (let i = 0; i < usersList.length; i++) {
                         const user = usersList[i];
                         const yOffset = 50 + (i * 145);
                         const uData = dateDB[h] ? dateDB[h][user] : null;
 
-                        ctx.fillStyle = uData ? '#ffffff' : '#eef1f3';
+                        ctx.fillStyle = uData && uData.text ? '#ffffff' : '#eef1f3';
                         ctx.beginPath(); ctx.roundRect(10, yOffset, canvas.width - 20, 135, 16); ctx.fill();
 
                         ctx.save(); ctx.beginPath(); ctx.arc(35, yOffset + 25, 14, 0, Math.PI * 2); ctx.clip();
@@ -486,13 +565,13 @@
 
                         ctx.fillStyle = '#2f3542'; ctx.font = 'bold 12px sans-serif'; ctx.fillText(user, 58, yOffset + 28);
 
-                        if (uData) {
+                        if (uData && uData.text) {
                             ctx.fillStyle = '#747d8c'; ctx.font = '11px sans-serif'; ctx.fillText(uData.text, 15, yOffset + 55);
                             if (videoElements[user] && !videoElements[user].paused) {
                                 ctx.drawImage(videoElements[user], 15, yOffset + 65, canvas.width - 30, 60);
                             } else {
                                 ctx.fillStyle = '#222'; ctx.fillRect(15, yOffset + 65, canvas.width - 30, 60);
-                                ctx.fillStyle = '#fff'; ctx.font = '10px sans-serif'; ctx.fillText('🎬 螢幕錄影載入中...', 30, yOffset + 100);
+                                ctx.fillStyle = '#fff'; ctx.font = '10px sans-serif'; ctx.fillText('🎬 影片載入中...', 30, yOffset + 100);
                             }
                         } else {
                             ctx.fillStyle = '#a4b0be'; ctx.font = '12px sans-serif'; ctx.fillText('等待日常更新中...💤', 20, yOffset + 75);
