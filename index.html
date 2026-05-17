@@ -54,7 +54,7 @@ button:hover{background:#57606f;}
 </head>
 <body>
 <h1>Diary</h1>
-<div id="connStatus" style="text-align:center;font-size:12px;color:#2ed573;font-weight:bold;margin-bottom:10px;">🟢 已連線</div>
+<div id="connStatus" style="text-align:center;font-size:12px;color:#ff4757;font-weight:bold;margin-bottom:10px;">🔴 未進入任何房間</div>
 <div class="room-members-bar">
 <div class="member-bar-title">🏡 目前房間成員：</div>
 <div id="roomMembersList" style="display:flex;gap:8px;align-items:center;"></div>
@@ -78,13 +78,13 @@ button:hover{background:#57606f;}
 <label>📍 目前所在地區：</label>
 <input type="text" id="userRegion" value="🇹🇼 台灣" placeholder="可自由修改地區" onchange="saveProfileAndJoin();updateLivePublishGrid();">
 <label>輸入想進入/新增的房間代碼：</label>
-<input type="text" id="roomCode" value="123" placeholder="例如: 123">
+<input type="text" id="roomCode" value="" placeholder="請輸入自訂房間號碼 (例如: 888)">
 <button onclick="addNewRoomCodeAction()">進入該房間 ➔</button>
 </div>
 </div>
 <div id="page2" class="tab-content">
 <div class="card">
-<h3>🕒 當地時段發布 (目前房號: <span id="currentPublishRoomTitle" style="color:#ff7675;">-</span>)</h3>
+<h3>🕒 當地時段發布 (目前房號: <span id="currentPublishRoomTitle" style="color:#ff7675;">請先在設定頁面進房</span>)</h3>
 <label>當前操作房號切換：</label>
 <select id="activeRoomSelect" onchange="handleActiveRoomToggle()"></select>
 <label>當地時間：</label>
@@ -171,30 +171,41 @@ document.write(`<option value="${h}" ${i===10?'selected':''}>${h}</option>`);
 </div>
 <script>
 let socket;let userAvatarBase64="";let currentRawVideoSrc="";let megaDB={};
-let myRoomList=["123"];let roomEmptySettings={};let currentSelectedRoomCode="";let globalCachedMembers=[];
+let myRoomList=[];let roomEmptySettings={};let currentSelectedRoomCode="";let globalCachedMembers=[];
 const fullDayHours=[];for(let i=0;i<24;i++){fullDayHours.push((i<10?'0'+i:i)+':00');}
 window.onload=function(){
-const today=new Date();const twOffset=8*60*60*1000;const localTime=new Date(today.getTime()+twOffset);
-document.getElementById('diaryDate').value=localTime.toISOString().split('T')[0];
+// 強化精準日期解析，防止時區差異
+const now = new Date();
+const yyyy = now.getFullYear();
+const mm = String(now.getMonth() + 1).padStart(2, '0');
+const dd = String(now.getDate()).padStart(2, '0');
+document.getElementById('diaryDate').value = `${yyyy}-${mm}-${dd}`;
+
 if(localStorage.getItem("mini2s_myRoomList"))myRoomList=JSON.parse(localStorage.getItem("mini2s_myRoomList"));
 if(localStorage.getItem("mini2s_roomEmptySettings"))roomEmptySettings=JSON.parse(localStorage.getItem("mini2s_roomEmptySettings"));
 
-// 初始化時詢問通知權限
 if("Notification" in window && Notification.permission==="default"){
 Notification.requestPermission();
 }
 
 socket=io();
-socket.on('connect',()=>{saveProfileAndJoin();});
+socket.on('connect',()=>{
+if(myRoomList.length > 0) {
+  saveProfileAndJoin();
+  document.getElementById("connStatus").innerText = "🟢 已連線房號: " + myRoomList.join(', ');
+  document.getElementById("connStatus").style.color = "#2ed573";
+}
+});
 socket.on('room-members-update',(data)=>{
 const oldLength = globalCachedMembers.length;
 const myName=document.getElementById("userName").value||"未命名";
 globalCachedMembers=data.members||[];
 const activeRoom=document.getElementById("activeRoomSelect").value;
 
-// 邏輯優化：比對是否有新成員加入，並觸發通知
 if(data.roomCode===activeRoom){
 renderRoomMembersUI(globalCachedMembers);
+// 強制聯動刷新畫面
+updateLivePublishGrid();
 if(globalCachedMembers.length > oldLength && oldLength > 0){
   const latestMember = globalCachedMembers[globalCachedMembers.length - 1];
   if(latestMember && latestMember.userName !== myName){
@@ -215,7 +226,6 @@ socket.on('new-diary-broadcast',(data)=>{
 const d=data.date;const h=data.hour;const u=data.userName;const r=data.roomCode;
 const myName=document.getElementById("userName").value||"未命名";
 
-// 邏輯優化：如果不是自己發布的，且有新影片資料，跳出APP通知彈窗
 if(u !== myName && data.video){
 triggerAppNotification("🕒 朋友更新了動態！", `房間 [${r}] 的【${u}】剛剛發布了 ${h} 的日常動態！`);
 }
@@ -223,16 +233,23 @@ triggerAppNotification("🕒 朋友更新了動態！", `房間 [${r}] 的【${u
 if(!megaDB[d])megaDB[d]=initDateHours();if(!megaDB[d][h])megaDB[d][h]={};if(!megaDB[d][h][r])megaDB[d][h][r]={};
 megaDB[d][h][r][u]={text:data.text,avatar:data.avatar,video:data.video,timeStart:0,yAlign:50,region:data.region||"🇹🇼 台灣"};
 localStorage.setItem("mini2s_megaDB",JSON.stringify(megaDB));
-updateLivePublishGrid();refreshWatchGridUI();renderManagementPageUI();
+
+// 關鍵核心：收到廣播不管在線快取如何，一律強制當場刷新所有視窗！
+updateLivePublishGrid();
+refreshWatchGridUI();
+renderManagementPageUI();
 });
 if(localStorage.getItem("mini2s_userName"))document.getElementById("userName").value=localStorage.getItem("mini2s_userName");
 if(localStorage.getItem("mini2s_userRegion"))document.getElementById("userRegion").value=localStorage.getItem("mini2s_userRegion");
 if(localStorage.getItem("mini2s_customAvatar")){userAvatarBase64=localStorage.getItem("mini2s_customAvatar");document.getElementById("avatarImage").src=userAvatarBase64;}
 megaDB=localStorage.getItem("mini2s_megaDB")?JSON.parse(localStorage.getItem("mini2s_megaDB")):{};
-updateRoomSelectOptions();saveProfileAndJoin();updateLivePublishGrid();syncInputText();
+
+updateRoomSelectOptions();
+if(myRoomList.length > 0){
+handleActiveRoomToggle();
+}
 };
 
-// 網頁版 APP 推播通知核心函數
 function triggerAppNotification(title, bodyText){
 if(!("Notification" in window)) return;
 if(Notification.permission === "granted"){
@@ -268,7 +285,14 @@ let html="";myRoomList.forEach(r=>{html+=`<option value="${r}">${r}</option>`;})
 if(s2)s2.innerHTML=html;if(s3)s3.innerHTML=html;if(s4)s4.innerHTML=html;
 }
 function handleActiveRoomToggle(){
-const activeRoom=document.getElementById("activeRoomSelect").value;document.getElementById("currentPublishRoomTitle").innerText=activeRoom;
+const activeRoom=document.getElementById("activeRoomSelect").value;
+if(!activeRoom){
+document.getElementById("currentPublishRoomTitle").innerText="請先在設定頁面進房";
+return;
+}
+document.getElementById("currentPublishRoomTitle").innerText=activeRoom;
+document.getElementById("connStatus").innerText = "🟢 已連線房號: " + myRoomList.join(', ');
+document.getElementById("connStatus").style.color = "#2ed573";
 updateLivePublishGrid();syncInputText();if(socket&&socket.connected){socket.emit('get-room-members',{roomCode:activeRoom});}
 }
 function renderRoomMembersUI(members){
@@ -401,7 +425,7 @@ gridContainer.appendChild(cell);
 function saveProfileAndJoin(){
 const uName=document.getElementById("userName").value||"未命名";const reg=document.getElementById("userRegion").value;
 localStorage.setItem("mini2s_userName",uName);localStorage.setItem("mini2s_userRegion",reg);
-if(socket&&socket.connected&&myRoomList.length>0){socket.emit('join-multiple-rooms',{rooms:myRoomList,userName:uName,avatar:userAvatarBase64});}
+if(socket&&socket.connected && myRoomList.length > 0){socket.emit('join-multiple-rooms',{rooms:myRoomList,userName:uName,avatar:userAvatarBase64});}
 }
 function handleDateChange(){
 syncInputText();const activeTabId=document.querySelector('.nav-item.active').id;
@@ -409,7 +433,9 @@ if(activeTabId==="nav2")updateLivePublishGrid();if(activeTabId==="nav3")refreshW
 }
 function syncInputText(){
 const hour=document.getElementById('currentHour').value;const uName=document.getElementById("userName").value||"未命名";const activeRoom=document.getElementById("activeRoomSelect").value;
-const dateDB=getActiveDateDB();document.getElementById('statusText').value=(dateDB[hour]&&dateDB[hour][activeRoom]&&dateDB[hour][activeRoom][uName])?dateDB[hour][activeRoom][uName].text:"";
+const dateDB=getActiveDateDB();
+if(!activeRoom) return;
+document.getElementById('statusText').value=(dateDB[hour]&&dateDB[hour][activeRoom]&&dateDB[hour][activeRoom][uName])?dateDB[hour][activeRoom][uName].text:"";
 }
 function switchTab(tabIndex){
 document.querySelectorAll('.tab-content').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
