@@ -37,9 +37,6 @@ button:hover{background:#57606f;}
 .cell-badge-name{font-size:10px;font-weight:700;}
 .cell-empty-placeholder{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;color:rgba(255,255,255,0.2);gap:4px;}
 .cell-empty-time{font-family:'Lexend',sans-serif;font-size:18px;font-weight:800;}
-#tweakControlPanel{display:none;background:#2f3542;padding:15px;margin-top:10px;border-radius:12px;}
-.range-control-group{background:rgba(255,255,255,0.1);padding:8px;border-radius:8px;margin-bottom:8px;}
-.range-slider{width:100%;margin:4px 0;accent-color:#ff7675;}
 .room-item-row{background:#f1f2f6;padding:15px;margin-bottom:10px;border-radius:14px;cursor:pointer;font-weight:bold;display:flex;justify-content:space-between;align-items:center;}
 .room-item-row:hover{background:#e4e7eb;}
 .room-detail-panel{display:none;background:#ffffff;border:2px solid #f1f2f6;padding:15px;margin-bottom:15px;border-radius:14px;}
@@ -110,12 +107,6 @@ document.write(`<option value="${h}" ${i===10?'selected':''}>${h}</option>`);
 <input type="file" id="fileVideoInput" accept="video/*" style="display:none;" onchange="prepareVideoEditor(this)">
 <label>🎬 發布對齊預覽牆：</label>
 <div class="quad-grid-stage" id="publishQuadGrid"></div>
-<div id="tweakControlPanel">
-<div class="range-control-group">
-<label style="color:#fff;font-size:11px;">↕️ 畫面上下移動置中: <span id="yVal">50%</span></label>
-<input type="range" id="vOffsetSlider" class="range-slider" min="0" max="100" value="50" oninput="updateVideoCropPreview()">
-</div>
-</div>
 <button id="uploadBtn" onclick="submitDiaryToServer()" style="margin-top:15px;">🚀 發布日常動態</button>
 <p id="timerStatus" style="color:#2ed573;font-weight:bold;text-align:center;margin-top:8px;font-size:13px;"></p>
 </div>
@@ -210,7 +201,7 @@ const d=data.date;const h=data.hour;const u=data.userName;const r=data.roomCode;
 if(!megaDB[d])megaDB[d]=initDateHours();
 if(!megaDB[d][h])megaDB[d][h]={};
 if(!megaDB[d][h][r])megaDB[d][h][r]={};
-megaDB[d][h][r][u]={text:data.text,avatar:data.avatar,video:data.video,timeStart:data.timeStart||0,yAlign:data.yAlign||50,region:data.region||"🇹🇼 台灣"};
+megaDB[d][h][r][u]={text:data.text,avatar:data.avatar,video:data.video,timeStart:0,yAlign:50,region:data.region||"🇹🇼 台灣"};
 localStorage.setItem("mini2s_megaDB",JSON.stringify(megaDB));
 const activeTabId=document.querySelector('.nav-item.active').id;
 if(activeTabId==="nav2")updateLivePublishGrid();
@@ -327,31 +318,25 @@ for(let i=0;i<4;i++){
 const user=userList[i];const cell=document.createElement("div");cell.className="grid-cell";
 if(user===myName){
 if(currentRawVideoSrc){
-cell.innerHTML=`<div class="cell-overlay-time-box"><div class="cell-time-title">${hour}</div><div class="cell-desc-title">${text}</div></div><div class="cell-profile-badge"><img class="cell-badge-avatar" src="${userAvatarBase64||'data:image/svg+xml;utf8,<svg viewBox=\'0 0 24 24\' fill=\'%23a4b0be\'><path d=\'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z\'/></svg>'}"><span class="cell-badge-name">${myName} ${reg}</span></div><video class="grid-cell-video" id="liveEditVideoRef" loop muted playsinline src="${currentRawVideoSrc}"></video>`;
+cell.innerHTML=`<div class="cell-overlay-time-box"><div class="cell-time-title">${hour}</div><div class="cell-desc-title">${text}</div></div><div class="cell-profile-badge"><img class="cell-badge-avatar" src="${userAvatarBase64||'data:image/svg+xml;utf8,<svg viewBox=\'0 0 24 24\' fill=\'%23a4b0be\'><path d=\'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z\'/></svg>'}"><span class="cell-badge-name">${myName} ${reg}</span></div><video class="grid-cell-video" id="liveEditVideoRef" loop muted playsinline src="${currentRawVideoSrc}" style="object-position:center center;"></video>`;
 }else{
 cell.innerHTML=`<div class="cell-empty-placeholder"><div class="cell-empty-time">${hour}</div><span style="font-size:24px;margin-bottom:5px;">${activeRoomEmptyPlaceholder}</span><span style="font-size:11px;font-weight:bold;">👉 點上方添加影片</span></div>`;
 }
 }else if(user&&dateDB[hour]&&dateDB[hour][activeRoom]&&dateDB[hour][activeRoom][user]&&dateDB[hour][activeRoom][user].text){
 const uData=dateDB[hour][activeRoom][user];
-cell.innerHTML=`<div class="cell-overlay-time-box"><div class="cell-time-title">${hour}</div><div class="cell-desc-title">${uData.text}</div></div><div class="cell-profile-badge"><img class="cell-badge-avatar" src="${uData.avatar||'data:image/svg+xml;utf8,<svg viewBox=\'0 0 24 24\' fill=\'%23a4b0be\'><path d=\'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z\'/></svg>'}"><span class="cell-badge-name">${user} ${uData.region||"🇹🇼 台灣"}</span></div><video class="grid-cell-video" loop autoplay muted playsinline src="${uData.video}" style="object-position:center ${uData.yAlign}%;"></video>`;
+cell.innerHTML=`<div class="cell-overlay-time-box"><div class="cell-time-title">${hour}</div><div class="cell-desc-title">${uData.text}</div></div><div class="cell-profile-badge"><img class="cell-badge-avatar" src="${uData.avatar||'data:image/svg+xml;utf8,<svg viewBox=\'0 0 24 24\' fill=\'%23a4b0be\'><path d=\'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z\'/></svg>'}"><span class="cell-badge-name">${user} ${uData.region||"🇹🇼 台灣"}</span></div><video class="grid-cell-video" loop autoplay muted playsinline src="${uData.video}" style="object-position:center center;"></video>`;
 }else{
 cell.innerHTML=`<div class="cell-empty-placeholder"><div class="cell-empty-time">${hour}</div><span style="font-size:24px;">${activeRoomEmptyPlaceholder}</span></div>`;
 }
 gridContainer.appendChild(cell);
 }
-if(currentRawVideoSrc){const editVid=document.getElementById("liveEditVideoRef");if(editVid){editVid.onloadedmetadata=function(){editVid.play();updateVideoCropPreview();}}}
+if(currentRawVideoSrc){const editVid=document.getElementById("liveEditVideoRef");if(editVid){editVid.onloadedmetadata=function(){editVid.play();}}}
 }
 function prepareVideoEditor(input){
 const file=input.files[0];if(!file)return;
 document.getElementById('timerStatus').innerText="⏳ 載入影片中...";const reader=new FileReader();
-reader.onload=function(e){currentRawVideoSrc=e.target.result;document.getElementById("tweakControlPanel").style.display="block";document.getElementById("vOffsetSlider").value=50;document.getElementById('timerStatus').innerText="✨ 請調整畫面中心！";updateLivePublishGrid();};
+reader.onload=function(e){currentRawVideoSrc=e.target.result;document.getElementById('timerStatus').innerText="✨ 影片已就緒，可以點擊下方發布！";updateLivePublishGrid();};
 reader.readAsDataURL(file);
-}
-function updateVideoCropPreview(){
-const videoEl=document.getElementById("liveEditVideoRef");if(!videoEl)return;
-const yAlign=document.getElementById("vOffsetSlider").value;
-document.getElementById("yVal").innerText=yAlign+"%";
-videoEl.style.objectPosition=`center ${yAlign}%`;
 }
 function submitDiaryToServer(){
 const textInput=document.getElementById('statusText').value;if(!textInput||!currentRawVideoSrc)return alert("請填寫狀態並選擇影片唷！🎬");
@@ -359,13 +344,13 @@ const date=document.getElementById('diaryDate').value;const hour=document.getEle
 const activeRoom=document.getElementById("activeRoomSelect").value;const reg=document.getElementById("userRegion").value;
 if(!activeRoom)return alert("你目前沒有在任何房間中！");const dateDB=getActiveDateDB();
 if(!dateDB[hour][activeRoom])dateDB[hour][activeRoom]={};
-dateDB[hour][activeRoom][uName]={text:textInput,avatar:userAvatarBase64,video:currentRawVideoSrc,timeStart:0,yAlign:parseInt(document.getElementById("vOffsetSlider").value),region:reg};
+dateDB[hour][activeRoom][uName]={text:textInput,avatar:userAvatarBase64,video:currentRawVideoSrc,timeStart:0,yAlign:50,region:reg};
 localStorage.setItem("mini2s_megaDB",JSON.stringify(megaDB));
-if(socket&&socket.connected){socket.emit('share-diary',{roomCode:activeRoom,userName:uName,date:date,hour:hour,text:textInput,avatar:userAvatarBase64,video:currentRawVideoSrc,timeStart:0,yAlign:dateDB[hour][activeRoom][uName].yAlign,region:reg});}
-alert("新增完成！🎉");clearPublishPage();
+if(socket&&socket.connected){socket.emit('share-diary',{roomCode:activeRoom,userName:uName,date:date,hour:hour,text:textInput,avatar:userAvatarBase64,video:currentRawVideoSrc,timeStart:0,yAlign:50,region:reg});}
+setTimeout(()=>{alert("新增完成！🎉");clearPublishPage();},300);
 }
 function clearPublishPage(){
-document.getElementById('statusText').value="";document.getElementById("tweakControlPanel").style.display="none";document.getElementById('timerStatus').innerText="";
+document.getElementById('statusText').value="";document.getElementById('timerStatus').innerText="";
 document.getElementById('cameraVideoInput').value="";document.getElementById('fileVideoInput').value="";currentRawVideoSrc="";updateLivePublishGrid();
 }
 function refreshWatchGridUI(){
@@ -376,7 +361,7 @@ for(let i=0;i<4;i++){
 const user=userList[i];const cell=document.createElement("div");cell.className="grid-cell";
 if(user&&dateDB[hour]&&dateDB[hour][watchRoom]&&dateDB[hour][watchRoom][user]&&dateDB[hour][watchRoom][user].text){
 const uData=dateDB[hour][watchRoom][user];
-cell.innerHTML=`<div class="cell-overlay-time-box"><div class="cell-time-title">${hour}</div><div class="cell-desc-title">${uData.text}</div></div><div class="cell-profile-badge"><img class="cell-badge-avatar" src="${uData.avatar||'data:image/svg+xml;utf8,<svg viewBox=\'0 0 24 24\' fill=\'%23a4b0be\'><path d=\'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z\'/></svg>'}"><span class="cell-badge-name">${user} ${uData.region||"🇹🇼 台灣"}</span></div><video class="grid-cell-video" loop autoplay muted playsinline src="${uData.video}" style="object-position:center ${uData.yAlign}%;"></video>`;
+cell.innerHTML=`<div class="cell-overlay-time-box"><div class="cell-time-title">${hour}</div><div class="cell-desc-title">${uData.text}</div></div><div class="cell-profile-badge"><img class="cell-badge-avatar" src="${uData.avatar||'data:image/svg+xml;utf8,<svg viewBox=\'0 0 24 24\' fill=\'%23a4b0be\'><path d=\'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z\'/></svg>'}"><span class="cell-badge-name">${user} ${uData.region||"🇹🇼 台灣"}</span></div><video class="grid-cell-video" loop autoplay muted playsinline src="${uData.video}" style="object-position:center center;"></video>`;
 }else{
 cell.innerHTML=`<div class="cell-empty-placeholder"><div class="cell-empty-time">${hour}</div><span style="font-size:24px;">${activePlaceholder}</span></div>`;
 }
@@ -437,7 +422,7 @@ const u=userList[i];if(!u)continue;const coord=gridCoords[i];const uData=(dateDB
 ctx.save();ctx.beginPath();ctx.rect(coord.x,coord.y,cellW,cellH);ctx.clip();
 if(uData&&uData.video&&vElements[u]&&vElements[u].videoWidth > 0){
 const video=vElements[u];let scale=Math.max(cellW/video.videoWidth,cellH/video.videoHeight);
-let drawW=video.videoWidth*scale;let drawH=video.videoHeight*scale;let drawX=coord.x+(cellW-drawW)/2;let drawY=coord.y+(cellH-drawH)*((uData.yAlign||50)/100);
+let drawW=video.videoWidth*scale;let drawH=video.videoHeight*scale;let drawX=coord.x+(cellW-drawW)/2;let drawY=coord.y+(cellH-drawH)/2;
 ctx.drawImage(video,drawX,drawY,drawW,drawH);ctx.fillStyle="rgba(0,0,0,0.12)";ctx.fillRect(coord.x,coord.y,cellW,cellH);
 ctx.fillStyle="#ffffff";ctx.textAlign="center";ctx.shadowColor="rgba(0,0,0,0.6)";ctx.shadowBlur=8;ctx.font="800 32px 'Lexend',sans-serif";ctx.fillText(h,coord.x+cellW/2,coord.y+(cellH/2)-10);
 ctx.font="bold 20px sans-serif";ctx.fillText(uData.text,coord.x+cellW/2,coord.y+(cellH/2)+30);ctx.shadowBlur=0;
