@@ -1,7 +1,7 @@
 {
   "name": "mini2s-diary",
   "version": "1.0.0",
-  "description": "Mini2s 多人雲端連線日記",
+  "description": "24H Multi-user Video Diary",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
