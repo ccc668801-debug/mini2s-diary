@@ -63,6 +63,7 @@ button:hover{background:#57606f;}
 <label>📅 日記日期：</label>
 <input type="date" id="diaryDate" class="date-picker-input" onchange="handleDateChange()">
 </div>
+
 <div id="page1" class="tab-content active">
 <div class="card">
 <h3>🔑 個人與自定義地區</h3>
@@ -82,6 +83,7 @@ button:hover{background:#57606f;}
 <button onclick="addNewRoomCodeAction()">進入該房間 ➔</button>
 </div>
 </div>
+
 <div id="page2" class="tab-content">
 <div class="card">
 <h3>🕒 當地時段發布 (目前房號: <span id="currentPublishRoomTitle" style="color:#ff7675;">請先在設定頁面進房</span>)</h3>
@@ -111,6 +113,7 @@ document.write(`<option value="${h}" ${i===10?'selected':''}>${h}</option>`);
 <p id="timerStatus" style="color:#2ed573;font-weight:bold;text-align:center;margin-top:8px;font-size:13px;"></p>
 </div>
 </div>
+
 <div id="page3" class="tab-content">
 <div class="card">
 <h3>看看大家在幹嘛</h3>
@@ -128,6 +131,7 @@ document.write(`<option value="${h}" ${i===10?'selected':''}>${h}</option>`);
 <div class="quad-grid-stage" id="watchQuadGrid"></div>
 </div>
 </div>
+
 <div id="page4" class="tab-content">
 <div class="card">
 <h3>全天 24 小時</h3>
@@ -138,6 +142,7 @@ document.write(`<option value="${h}" ${i===10?'selected':''}>${h}</option>`);
 </div>
 <canvas id="canvasStage" width="540" height="960"></canvas>
 </div>
+
 <div id="page5" class="tab-content">
 <div class="card">
 <h3>🏠 房間清單管理</h3>
@@ -162,6 +167,7 @@ document.write(`<option value="${h}" ${i===10?'selected':''}>${h}</option>`);
 <div id="myUploadsContainer"></div>
 </div>
 </div>
+
 <div class="navbar">
 <div class="nav-item active" id="nav1" onclick="switchTab(0)">🔑 設定</div>
 <div class="nav-item" id="nav2" onclick="switchTab(1)">🕒 發布日常</div>
@@ -169,12 +175,13 @@ document.write(`<option value="${h}" ${i===10?'selected':''}>${h}</option>`);
 <div class="nav-item" id="nav4" onclick="switchTab(3)">🎬 影片生成</div>
 <div class="nav-item" id="nav5" onclick="switchTab(4)">🏠 房間管理</div>
 </div>
+
 <script>
 let socket;let userAvatarBase64="";let currentRawVideoSrc="";let megaDB={};
 let myRoomList=[];let roomEmptySettings={};let currentSelectedRoomCode="";let globalCachedMembers=[];
 const fullDayHours=[];for(let i=0;i<24;i++){fullDayHours.push((i<10?'0'+i:i)+':00');}
+
 window.onload=function(){
-// 強化精準日期解析，防止時區差異
 const now = new Date();
 const yyyy = now.getFullYear();
 const mm = String(now.getMonth() + 1).padStart(2, '0');
@@ -184,10 +191,6 @@ document.getElementById('diaryDate').value = `${yyyy}-${mm}-${dd}`;
 if(localStorage.getItem("mini2s_myRoomList"))myRoomList=JSON.parse(localStorage.getItem("mini2s_myRoomList"));
 if(localStorage.getItem("mini2s_roomEmptySettings"))roomEmptySettings=JSON.parse(localStorage.getItem("mini2s_roomEmptySettings"));
 
-if("Notification" in window && Notification.permission==="default"){
-Notification.requestPermission();
-}
-
 socket=io();
 socket.on('connect',()=>{
 if(myRoomList.length > 0) {
@@ -196,25 +199,18 @@ if(myRoomList.length > 0) {
   document.getElementById("connStatus").style.color = "#2ed573";
 }
 });
-socket.on('room-members-update',(data)=>{
-const oldLength = globalCachedMembers.length;
-const myName=document.getElementById("userName").value||"未命名";
-globalCachedMembers=data.members||[];
-const activeRoom=document.getElementById("activeRoomSelect").value;
 
+socket.on('room-members-update',(data)=>{
+const activeRoom=document.getElementById("activeRoomSelect").value;
 if(data.roomCode===activeRoom){
-renderRoomMembersUI(globalCachedMembers);
-// 強制聯動刷新畫面
-updateLivePublishGrid();
-if(globalCachedMembers.length > oldLength && oldLength > 0){
-  const latestMember = globalCachedMembers[globalCachedMembers.length - 1];
-  if(latestMember && latestMember.userName !== myName){
-	triggerAppNotification("🏡 新成員加入房間", `【${latestMember.userName}】剛剛進入了房間 [${data.roomCode}]！`);
-  }
+  globalCachedMembers=data.members||[];
+  renderRoomMembersUI(globalCachedMembers);
+  updateLivePublishGrid();
+  refreshWatchGridUI();
 }
-}
-if(currentSelectedRoomCode===data.roomCode)renderSelectedRoomMembersOnly(globalCachedMembers);
+if(currentSelectedRoomCode===data.roomCode)renderSelectedRoomMembersOnly(data.members||[]);
 });
+
 socket.on('update-room-empty-status',(data)=>{
 if(data&&data.roomCode){
 roomEmptySettings[data.roomCode]=data.statusText;localStorage.setItem("mini2s_roomEmptySettings",JSON.stringify(roomEmptySettings));
@@ -222,43 +218,25 @@ if(data.roomCode===currentSelectedRoomCode)document.getElementById("currentEmpty
 updateLivePublishGrid();refreshWatchGridUI();
 }
 });
+
 socket.on('new-diary-broadcast',(data)=>{
 const d=data.date;const h=data.hour;const u=data.userName;const r=data.roomCode;
-const myName=document.getElementById("userName").value||"未命名";
-
-if(u !== myName && data.video){
-triggerAppNotification("🕒 朋友更新了動態！", `房間 [${r}] 的【${u}】剛剛發布了 ${h} 的日常動態！`);
-}
-
 if(!megaDB[d])megaDB[d]=initDateHours();if(!megaDB[d][h])megaDB[d][h]={};if(!megaDB[d][h][r])megaDB[d][h][r]={};
 megaDB[d][h][r][u]={text:data.text,avatar:data.avatar,video:data.video,timeStart:0,yAlign:50,region:data.region||"🇹🇼 台灣"};
 localStorage.setItem("mini2s_megaDB",JSON.stringify(megaDB));
-
-// 關鍵核心：收到廣播不管在線快取如何，一律強制當場刷新所有視窗！
 updateLivePublishGrid();
 refreshWatchGridUI();
 renderManagementPageUI();
 });
+
 if(localStorage.getItem("mini2s_userName"))document.getElementById("userName").value=localStorage.getItem("mini2s_userName");
 if(localStorage.getItem("mini2s_userRegion"))document.getElementById("userRegion").value=localStorage.getItem("mini2s_userRegion");
 if(localStorage.getItem("mini2s_customAvatar")){userAvatarBase64=localStorage.getItem("mini2s_customAvatar");document.getElementById("avatarImage").src=userAvatarBase64;}
 megaDB=localStorage.getItem("mini2s_megaDB")?JSON.parse(localStorage.getItem("mini2s_megaDB")):{};
 
 updateRoomSelectOptions();
-if(myRoomList.length > 0){
-handleActiveRoomToggle();
-}
+if(myRoomList.length > 0) handleActiveRoomToggle();
 };
-
-function triggerAppNotification(title, bodyText){
-if(!("Notification" in window)) return;
-if(Notification.permission === "granted"){
-new Notification(title, {
-  body: bodyText,
-  icon: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%232f3542"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>'
-});
-}
-}
 
 function initDateHours(){let obj={};fullDayHours.forEach(h=>obj[h]={});return obj;}
 function handleAvatarFile(input){
@@ -267,13 +245,18 @@ reader.onload=function(e){userAvatarBase64=e.target.result;document.getElementBy
 reader.readAsDataURL(file);
 }
 function getActiveDateDB(){const date=document.getElementById('diaryDate').value;if(!megaDB[date])megaDB[date]=initDateHours();return megaDB[date];}
-function GetRoomUserList(hour,roomCode){
-const dateDB=getActiveDateDB();const myName=document.getElementById("userName").value||"未命名";const userSet=new Set();
-userSet.add(myName);
-if(dateDB[hour]&&dateDB[hour][roomCode]){Object.keys(dateDB[hour][roomCode]).forEach(u=>{if(u)userSet.add(u);});}
-globalCachedMembers.forEach(m=>{if(m.userName)userSet.add(m.userName);});
-return Array.from(userSet).slice(0,4);
+
+// 關鍵核心：完全依照後端座位(seatNo)排座，回傳固定 4 個位置的成員名字
+function GetSeatUserArray(){
+let seats = [null, null, null, null]; // 分別代表 1, 2, 3, 4 號位
+globalCachedMembers.forEach(m => {
+  if(m.seatNo >= 1 && m.seatNo <= 4) {
+	seats[m.seatNo - 1] = m.userName;
+  }
+});
+return seats;
 }
+
 function addNewRoomCodeAction(){
 const code=document.getElementById("roomCode").value.trim();if(!code)return alert("請輸入房間代碼！");
 if(!myRoomList.includes(code)){myRoomList.push(code);localStorage.setItem("mini2s_myRoomList",JSON.stringify(myRoomList));}
@@ -286,53 +269,48 @@ if(s2)s2.innerHTML=html;if(s3)s3.innerHTML=html;if(s4)s4.innerHTML=html;
 }
 function handleActiveRoomToggle(){
 const activeRoom=document.getElementById("activeRoomSelect").value;
-if(!activeRoom){
-document.getElementById("currentPublishRoomTitle").innerText="請先在設定頁面進房";
-return;
-}
+if(!activeRoom){document.getElementById("currentPublishRoomTitle").innerText="請先在設定頁面進房";return;}
 document.getElementById("currentPublishRoomTitle").innerText=activeRoom;
 document.getElementById("connStatus").innerText = "🟢 已連線房號: " + myRoomList.join(', ');
-document.getElementById("connStatus").style.color = "#2ed573";
-updateLivePublishGrid();syncInputText();if(socket&&socket.connected){socket.emit('get-room-members',{roomCode:activeRoom});}
+updateLivePublishGrid();syncInputText();if(socket&&socket.connected){socket.emit('join-multiple-rooms',{rooms:myRoomList,userName:document.getElementById("userName").value||"未命名",avatar:userAvatarBase64});}
 }
+
 function renderRoomMembersUI(members){
-const bar=document.getElementById("roomMembersList");if(!bar)return;bar.innerHTML="";const myName=document.getElementById("userName").value||"未命名";
-let uniqueList=[{userName:myName,avatar:userAvatarBase64}];members.forEach(m=>{if(m.userName&&m.userName!==myName)uniqueList.push(m);});
-uniqueList.slice(0,4).forEach(m=>{
+const bar=document.getElementById("roomMembersList");if(!bar)return;bar.innerHTML="";
+// 按照座位順序排列顯示
+let sorted = [...members].sort((a,b)=>a.seatNo - b.seatNo);
+sorted.forEach(m=>{
 const defaultSvg="data:image/svg+xml;utf8,<svg viewBox='0 0 24 24' fill='%23a4b0be'><path d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z'/></svg>";
-bar.innerHTML+=`<div class="member-chip"><img class="member-chip-avatar" src="${m.avatar||defaultSvg}"><span class="member-chip-name">${m.userName}</span></div>`;
+bar.innerHTML+=`<div class="member-chip"><img class="member-chip-avatar" src="${m.avatar||defaultSvg}"><span class="member-chip-name">${m.userName} (${m.seatNo})</span></div>`;
 });
 }
+
 function clickRoomToManage(roomCode){
 currentSelectedRoomCode=roomCode;document.getElementById("selectedRoomCodeTitle").innerText=roomCode;
 const currentEmpty=roomEmptySettings[roomCode]||"💤";document.getElementById("currentEmptyPlaceholderStatus").innerText=currentEmpty;
 document.getElementById("roomDetailPanel").style.display="block";
-if(socket&&socket.connected){socket.emit('get-room-members',{roomCode:roomCode});}else{renderSelectedRoomMembersOnly([]);}
+renderSelectedRoomMembersOnly(globalCachedMembers);
 }
 function renderSelectedRoomMembersOnly(members){
-const container=document.getElementById("manageMembersContainer");if(!container)return;container.innerHTML="";const myName=document.getElementById("userName").value||"未命名";
-let currentList=[{userName:myName,avatar:userAvatarBase64}];members.forEach(m=>{if(m.userName&&m.userName!==myName)currentList.push(m);});
-currentList.forEach(m=>{
-container.innerHTML+=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;background:#f1f2f6;padding:8px;border-radius:8px;"><img src="${m.avatar||'data:image/svg+xml;utf8,<svg viewBox=\'0 0 24 24\' fill=\'%23a4b0be\'><path d=\'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z\'/></svg>'}" style="width:24px;height:24px;border-radius:50%;object-fit:cover;"><span style="font-size:13px;font-weight:bold;">${m.userName} ${m.userName===myName?'(你)':''}</span></div>`;
+const container=document.getElementById("manageMembersContainer");if(!container)return;container.innerHTML="";
+members.forEach(m=>{
+container.innerHTML+=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;background:#f1f2f6;padding:8px;border-radius:8px;"><img src="${m.avatar||'data:image/svg+xml;utf8,<svg viewBox=\'0 0 24 24\' fill=\'%23a4b0be\'><path d=\'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z\'/></svg>'}" style="width:24px;height:24px;border-radius:50%;object-fit:cover;"><span style="font-size:13px;font-weight:bold;">${m.userName} (座位 ${m.seatNo})</span></div>`;
 });
 }
 function broadcastCustomEmptyStatus(){
-if(!currentSelectedRoomCode)return;const inputVal=document.getElementById("customEmptyStatusInput").value.trim();if(!inputVal)return alert("請輸入狀態符號文字唷！🎨");
-if(socket&&socket.connected){socket.emit('change-room-empty-status',{roomCode:currentSelectedRoomCode,statusText:inputVal});document.getElementById("customEmptyStatusInput").value="";}else{
-roomEmptySettings[currentSelectedRoomCode]=inputVal;localStorage.setItem("mini2s_roomEmptySettings",JSON.stringify(roomEmptySettings));
-document.getElementById("currentEmptyPlaceholderStatus").innerText=inputVal;updateLivePublishGrid();refreshWatchGridUI();
-}
+if(!currentSelectedRoomCode)return;const inputVal=document.getElementById("customEmptyStatusInput").value.trim();if(!inputVal)return alert("請輸入狀態符號！");
+if(socket&&socket.connected){socket.emit('change-room-empty-status',{roomCode:currentSelectedRoomCode,statusText:inputVal});document.getElementById("customEmptyStatusInput").value="";}
 }
 function deleteAndExitRoomFromList(){
-if(!currentSelectedRoomCode)return;if(!confirm(`確定要刪除並退出房間 [${currentSelectedRoomCode}] 嗎？`)) return;
+if(!currentSelectedRoomCode)return;if(!confirm(`確定要退出房間 [${currentSelectedRoomCode}] 嗎？`)) return;
 myRoomList=myRoomList.filter(r=>r!==currentSelectedRoomCode);localStorage.setItem("mini2s_myRoomList",JSON.stringify(myRoomList));
-if(socket&&socket.connected){socket.emit('exit-room',{roomCode:currentSelectedRoomCode});}
 document.getElementById("roomDetailPanel").style.display="none";currentSelectedRoomCode="";updateRoomSelectOptions();renderManagementPageUI();updateLivePublishGrid();
 }
+
 function renderManagementPageUI(){
 const listContainer=document.getElementById("roomListContainer");
 if(listContainer){
-listContainer.innerHTML="";if(myRoomList.length===0){listContainer.innerHTML=`<p style="text-align:center;font-size:13px;color:#a4b0be;">目前沒有任何房間紀錄</p>`;}
+listContainer.innerHTML="";if(myRoomList.length===0)listContainer.innerHTML=`<p style="text-align:center;font-size:13px;color:#a4b0be;">目前沒有任何房間紀錄</p>`;
 myRoomList.forEach(r=>{
 const currentEmptyStr=roomEmptySettings[r]||"💤";
 listContainer.innerHTML+=`<div class="room-item-row" onclick="clickRoomToManage('${r}')"><span>🏠 房間代碼：${r}</span><span style="font-size:12px;color:#747d8c;background:#fff;padding:4px 8px;border-radius:10px;">預設: ${currentEmptyStr} ➔</span></div>`;
@@ -351,7 +329,7 @@ uploadsContainer.innerHTML+=`<div class="manage-item-row"><div class="manage-ite
 });
 }
 });
-if(!hasRecords){uploadsContainer.innerHTML=`<p style="font-size:12px;color:#a4b0be;text-align:center;">目前都還沒有發布影片紀錄唷！</p>`;}
+if(!hasRecords)uploadsContainer.innerHTML=`<p style="font-size:12px;color:#a4b0be;text-align:center;">目前都還沒有發布影片紀錄唷！</p>`;
 }
 }
 function deleteMyDiaryRecord(hour,roomCode){
@@ -360,36 +338,41 @@ const date=document.getElementById('diaryDate').value;const myName=document.getE
 if(dateDB[hour]&&dateDB[hour][roomCode]&&dateDB[hour][roomCode][myName]){
 delete dateDB[hour][roomCode][myName];localStorage.setItem("mini2s_megaDB",JSON.stringify(megaDB));
 if(socket&&socket.connected){socket.emit('share-diary',{roomCode:roomCode,userName:myName,date:date,hour:hour,text:"",avatar:"",video:"",timeStart:0,yAlign:50,region:""});}
-alert("已成功刪除該時段紀錄！");renderManagementPageUI();updateLivePublishGrid();
+alert("已成功刪除！");renderManagementPageUI();updateLivePublishGrid();
 }
 }
+
+// 嚴格入座渲染：1左上、2右上、3左下、4右下
 function updateLivePublishGrid(){
 const gridContainer=document.getElementById("publishQuadGrid");if(!gridContainer)return;gridContainer.innerHTML="";
 const activeRoom=document.getElementById("activeRoomSelect").value;if(!activeRoom)return;
 const hour=document.getElementById("currentHour").value;const text=document.getElementById("statusText").value||"";const myName=document.getElementById("userName").value||"未命名";
-const reg=document.getElementById("userRegion").value||"🇹🇼 台灣";const dateDB=getActiveDateDB();const userList=GetRoomUserList(hour,activeRoom);const activeRoomEmptyPlaceholder=roomEmptySettings[activeRoom]||"💤";
-for(let i=0;i<4;i++){
-const user=userList[i];const cell=document.createElement("div");cell.className="grid-cell";
+const reg=document.getElementById("userRegion").value||"🇹🇼 台灣";const dateDB=getActiveDateDB();
+const seatUsers=GetSeatUserArray();const activeRoomEmptyPlaceholder=roomEmptySettings[activeRoom]||"💤";
+
+for(let i=0; i<4; i++){
+const user=seatUsers[i];const cell=document.createElement("div");cell.className="grid-cell";
 if(user===myName){
 if(currentRawVideoSrc){
-cell.innerHTML=`<div class="cell-overlay-time-box"><div class="cell-time-title">${hour}</div><div class="cell-desc-title">${text}</div></div><div class="cell-profile-badge"><img class="cell-badge-avatar" src="${userAvatarBase64||'data:image/svg+xml;utf8,<svg viewBox=\'0 0 24 24\' fill=\'%23a4b0be\'><path d=\'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z\'/></svg>'}"><span class="cell-badge-name">${myName} ${reg}</span></div><video class="grid-cell-video" id="liveEditVideoRef" loop muted playsinline src="${currentRawVideoSrc}" style="object-position:center center;"></video>`;
+cell.innerHTML=`<div class="cell-overlay-time-box"><div class="cell-time-title">${hour}</div><div class="cell-desc-title">${text}</div></div><div class="cell-profile-badge"><img class="cell-badge-avatar" src="${userAvatarBase64||'data:image/svg+xml;utf8,<svg viewBox=\'0 0 24 24\' fill=\'%23a4b0be\'><path d=\'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z\'/></svg>'}"><span class="cell-badge-name">${myName} (${i+1}) ${reg}</span></div><video class="grid-cell-video" id="liveEditVideoRef" loop muted playsinline src="${currentRawVideoSrc}"></video>`;
 }else{
-cell.innerHTML=`<div class="cell-empty-placeholder"><div class="cell-empty-time">${hour}</div><span style="font-size:24px;margin-bottom:5px;">${activeRoomEmptyPlaceholder}</span><span style="font-size:11px;font-weight:bold;">👉 點上方添加影片</span></div>`;
+cell.innerHTML=`<div class="cell-empty-placeholder"><div class="cell-empty-time">${hour}</div><span style="font-size:24px;margin-bottom:5px;">${activeRoomEmptyPlaceholder}</span><span style="font-size:11px;font-weight:bold;">👉 (${i+1}) 點上方添加影片</span></div>`;
 }
-}else if(user&&dateDB[hour]&&dateDB[hour][activeRoom]&&dateDB[hour][activeRoom][user]&&dateDB[hour][activeRoom][user].text){
+}else if(user&&dateDB[hour]&&dateDB[hour][activeRoom]&&dateDB[hour][activeRoom][user]&&dateDB[hour][activeRoom][user].video){
 const uData=dateDB[hour][activeRoom][user];
-cell.innerHTML=`<div class="cell-overlay-time-box"><div class="cell-time-title">${hour}</div><div class="cell-desc-title">${uData.text}</div></div><div class="cell-profile-badge"><img class="cell-badge-avatar" src="${uData.avatar||'data:image/svg+xml;utf8,<svg viewBox=\'0 0 24 24\' fill=\'%23a4b0be\'><path d=\'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z\'/></svg>'}"><span class="cell-badge-name">${user} ${uData.region||"🇹🇼 台灣"}</span></div><video class="grid-cell-video" loop autoplay muted playsinline src="${uData.video}" style="object-position:center center;"></video>`;
+cell.innerHTML=`<div class="cell-overlay-time-box"><div class="cell-time-title">${hour}</div><div class="cell-desc-title">${uData.text}</div></div><div class="cell-profile-badge"><img class="cell-badge-avatar" src="${uData.avatar||'data:image/svg+xml;utf8,<svg viewBox=\'0 0 24 24\' fill=\'%23a4b0be\'><path d=\'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z\'/></svg>'}"><span class="cell-badge-name">${user} (${i+1}) ${uData.region||""}</span></div><video class="grid-cell-video" loop autoplay muted playsinline src="${uData.video}"></video>`;
 }else{
-cell.innerHTML=`<div class="cell-empty-placeholder"><div class="cell-empty-time">${hour}</div><span style="font-size:24px;">${activeRoomEmptyPlaceholder}</span></div>`;
+cell.innerHTML=`<div class="cell-empty-placeholder"><div class="cell-empty-time">${hour}</div><span style="font-size:24px;">${activeRoomEmptyPlaceholder}</span><span style="font-size:10px;color:rgba(255,255,255,0.15)">位置 (${i+1})</span></div>`;
 }
 gridContainer.appendChild(cell);
 }
-if(currentRawVideoSrc){const editVid=document.getElementById("liveEditVideoRef");if(editVid){editVid.onloadedmetadata=function(){editVid.play();}}}
+if(currentRawVideoSrc){const editVid=document.getElementById("liveEditVideoRef");if(editVid){editVid.onloadedmetadata=function(){editVid.play().catch(e=>{});}}}
 }
+
 function prepareVideoEditor(input){
 const file=input.files[0];if(!file)return;
 document.getElementById('timerStatus').innerText="⏳ 載入影片中...";const reader=new FileReader();
-reader.onload=function(e){currentRawVideoSrc=e.target.result;document.getElementById('timerStatus').innerText="✨ 影片已就緒，可以點擊下方發布！";updateLivePublishGrid();};
+reader.onload=function(e){currentRawVideoSrc=e.target.result;document.getElementById('timerStatus').innerText="✨ 影片已就緒！";updateLivePublishGrid();};
 reader.readAsDataURL(file);
 }
 function submitDiaryToServer(){
@@ -407,15 +390,17 @@ function clearPublishPage(){
 document.getElementById('statusText').value="";document.getElementById('timerStatus').innerText="";
 document.getElementById('cameraVideoInput').value="";document.getElementById('fileVideoInput').value="";currentRawVideoSrc="";updateLivePublishGrid();
 }
+
 function refreshWatchGridUI(){
 const gridContainer=document.getElementById("watchQuadGrid");if(!gridContainer)return;gridContainer.innerHTML="";
 const watchRoom=document.getElementById("watchRoomSelect").value;if(!watchRoom)return;
-const hour=document.getElementById("watchHourSelect").value;const dateDB=getActiveDateDB();const userList=GetRoomUserList(hour,watchRoom);const activePlaceholder=roomEmptySettings[watchRoom]||"💤";
+const hour=document.getElementById("watchHourSelect").value;const dateDB=getActiveDateDB();
+const seatUsers=GetSeatUserArray();const activePlaceholder=roomEmptySettings[watchRoom]||"💤";
 for(let i=0;i<4;i++){
-const user=userList[i];const cell=document.createElement("div");cell.className="grid-cell";
-if(user&&dateDB[hour]&&dateDB[hour][watchRoom]&&dateDB[hour][watchRoom][user]&&dateDB[hour][watchRoom][user].text){
+const user=seatUsers[i];const cell=document.createElement("div");cell.className="grid-cell";
+if(user&&dateDB[hour]&&dateDB[hour][watchRoom]&&dateDB[hour][watchRoom][user]&&dateDB[hour][watchRoom][user].video){
 const uData=dateDB[hour][watchRoom][user];
-cell.innerHTML=`<div class="cell-overlay-time-box"><div class="cell-time-title">${hour}</div><div class="cell-desc-title">${uData.text}</div></div><div class="cell-profile-badge"><img class="cell-badge-avatar" src="${uData.avatar||'data:image/svg+xml;utf8,<svg viewBox=\'0 0 24 24\' fill=\'%23a4b0be\'><path d=\'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z\'/></svg>'}"><span class="cell-badge-name">${user} ${uData.region||"🇹🇼 台灣"}</span></div><video class="grid-cell-video" loop autoplay muted playsinline src="${uData.video}" style="object-position:center center;"></video>`;
+cell.innerHTML=`<div class="cell-overlay-time-box"><div class="cell-time-title">${hour}</div><div class="cell-desc-title">${uData.text}</div></div><div class="cell-profile-badge"><img class="cell-badge-avatar" src="${uData.avatar||'data:image/svg+xml;utf8,<svg viewBox=\'0 0 24 24\' fill=\'%23a4b0be\'><path d=\'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z\'/></svg>'}"><span class="cell-badge-name">${user} (${i+1}) ${uData.region||""}</span></div><video class="grid-cell-video" loop autoplay muted playsinline src="${uData.video}"></video>`;
 }else{
 cell.innerHTML=`<div class="cell-empty-placeholder"><div class="cell-empty-time">${hour}</div><span style="font-size:24px;">${activePlaceholder}</span></div>`;
 }
@@ -433,8 +418,7 @@ if(activeTabId==="nav2")updateLivePublishGrid();if(activeTabId==="nav3")refreshW
 }
 function syncInputText(){
 const hour=document.getElementById('currentHour').value;const uName=document.getElementById("userName").value||"未命名";const activeRoom=document.getElementById("activeRoomSelect").value;
-const dateDB=getActiveDateDB();
-if(!activeRoom) return;
+const dateDB=getActiveDateDB();if(!activeRoom) return;
 document.getElementById('statusText').value=(dateDB[hour]&&dateDB[hour][activeRoom]&&dateDB[hour][activeRoom][uName])?dateDB[hour][activeRoom][uName].text:"";
 }
 function switchTab(tabIndex){
@@ -442,6 +426,7 @@ document.querySelectorAll('.tab-content').forEach(p=>p.classList.remove('active'
 document.querySelectorAll('.tab-content')[tabIndex].classList.add('active');document.querySelectorAll('.nav-item')[tabIndex].classList.add('active');
 if(tabIndex===1)handleActiveRoomToggle();if(tabIndex===2)refreshWatchGridUI();if(tabIndex===4)renderManagementPageUI();
 }
+
 async function renderMegaFullDayVideo(){
 const canvas=document.getElementById('canvasStage');const ctx=canvas.getContext('2d');const outputArea=document.getElementById('megaOutputArea');const dateDB=getActiveDateDB();
 const rCode=document.getElementById("renderRoomSelect").value;if(!rCode)return alert("請選擇房間！");const activePlaceholder=roomEmptySettings[rCode]||"💤";
@@ -458,23 +443,23 @@ const cellW=canvas.width/2;const cellH=canvas.height/2;const gridCoords=[{x:0,y:
 const vPlayerPool=[document.createElement('video'),document.createElement('video'),document.createElement('video'),document.createElement('video')];
 vPlayerPool.forEach(v=>{v.muted=true;v.playsInline=true;v.preload="auto";});
 const defaultSvg="data:image/svg+xml;utf8,<svg viewBox='0 0 24 24' fill='%23a4b0be'><path d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z'/></svg>";
+
 for(let h of activeHours){
-const userList=GetRoomUserList(h,rCode);const loadedAvatars=[];
+const seatUsers=GetSeatUserArray();const loadedAvatars=[];
 for(let i=0;i<4;i++){
-let u=userList[i];let src=defaultSvg;
+let u=seatUsers[i];let src=defaultSvg;
 if(u&&dateDB[h]&&dateDB[h][rCode]&&dateDB[h][rCode][u]&&dateDB[h][rCode][u].avatar){src=dateDB[h][rCode][u].avatar;}
 const img=new Image();img.src=src;img.onload=function(){loadedAvatars[i]=img;};
 if(u&&dateDB[h]&&dateDB[h][rCode]&&dateDB[h][rCode][u]&&dateDB[h][rCode][u].video){
-vPlayerPool[i].src=dateDB[h][rCode][u].video;vPlayerPool[i].load();vPlayerPool[i].currentTime=0;
-vPlayerPool[i].play().catch(e=>{});
+vPlayerPool[i].src=dateDB[h][rCode][u].video;vPlayerPool[i].load();vPlayerPool[i].currentTime=0;vPlayerPool[i].play().catch(e=>{});
 }else{vPlayerPool[i].src="";}
 }
-await new Promise(r=>setTimeout(r,200));
+await new Promise(r=>setTimeout(r,250));
 let startRun=Date.now();
 while(Date.now()-startRun<2000){
 ctx.fillStyle='#1e1e1e';ctx.fillRect(0,0,canvas.width,canvas.height);
 for(let i=0;i<4;i++){
-const u=userList[i];const coord=gridCoords[i];const uData=(u&&dateDB[h]&&dateDB[h][rCode])?dateDB[h][rCode][u]:null;
+const u=seatUsers[i];const coord=gridCoords[i];const uData=(u&&dateDB[h]&&dateDB[h][rCode])?dateDB[h][rCode][u]:null;
 ctx.save();ctx.beginPath();ctx.rect(coord.x,coord.y,cellW,cellH);ctx.clip();
 if(uData&&uData.video&&vPlayerPool[i].src){
 let vEl=vPlayerPool[i];let scale=Math.max(cellW/(vEl.videoWidth||640),cellH/(vEl.videoHeight||480));
@@ -484,9 +469,11 @@ ctx.drawImage(vEl,drawX,drawY,drawW,drawH);ctx.fillStyle="rgba(0,0,0,0.12)";ctx.
 ctx.fillStyle="#ffffff";ctx.textAlign="center";ctx.shadowColor="rgba(0,0,0,0.6)";ctx.shadowBlur=8;ctx.font="800 32px 'Lexend',sans-serif";ctx.fillText(h,coord.x+cellW/2,coord.y+(cellH/2)-10);
 ctx.font="bold 20px sans-serif";ctx.fillText(uData.text,coord.x+cellW/2,coord.y+(cellH/2)+30);ctx.shadowBlur=0;
 const regionDisplay=uData.region||"";const bx=coord.x+12;const by=coord.y+12;
-ctx.fillStyle="rgba(0,0,0,0.3)";ctx.beginPath();ctx.roundRect(bx,by,125,26,13);ctx.fill();
+ctx.fillStyle="rgba(0,0,0,0.3)";ctx.beginPath();ctx.roundRect(bx,by,135,26,13);ctx.fill();
 if(loadedAvatars[i]){ctx.save();ctx.beginPath();ctx.arc(bx+13,by+13,9,0,Math.PI*2);ctx.clip();ctx.drawImage(loadedAvatars[i],bx+4,by+4,18,18);ctx.restore();}
-ctx.fillStyle="#ffffff";ctx.textAlign="left";ctx.font="bold 11px sans-serif";ctx.fillText(`${u} ${regionDisplay.substring(0,6)}`,bx+28,by+17);
+ctx.fillStyle="#ffffff";ctx.textAlign="left";ctx.font="bold 11px sans-serif";
+// 修正處：移除 substring 限制，確保台灣完整顯示
+ctx.fillText(`${u} (${i+1}) ${regionDisplay}`,bx+28,by+17);
 }else{
 ctx.fillStyle='#121212';ctx.fillRect(coord.x,coord.y,cellW,cellH);ctx.fillStyle='rgba(255,255,255,0.2)';ctx.textAlign="center";
 ctx.font="800 30px 'Lexend',sans-serif";ctx.fillText(h,coord.x+cellW/2,coord.y+(cellH/2)-15);ctx.font="30px sans-serif";ctx.fillText(activePlaceholder,coord.x+cellW/2,coord.y+(cellH/2)+25);
