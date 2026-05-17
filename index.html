@@ -56,8 +56,9 @@
         }
         .upload-opt-btn:active { background: #f1f2f6; border-color: #2f3542; }
 
-        #editorBox { display: none; background: #2f3542; color: #fff; padding: 15px; margin-top: 10px; border-radius: 12px; }
-        .video-container-wrapper { position: relative; width: 100%; height: 160px; background: #000; overflow: hidden; border-radius: 8px; margin-bottom: 10px; }
+        /* 發布頁面：終極「所見即所得」滿版直式編輯區 */
+        #editorBox { display: none; background: #2f3542; padding: 15px; margin-top: 10px; border-radius: 12px; }
+        .video-container-wrapper { position: relative; width: 100%; height: 280px; background: #000; overflow: hidden; border-radius: 12px; margin-bottom: 12px; }
         #uploadVideoPreview { position: absolute; width: 100%; height: 100%; object-fit: cover; }
         .range-control-group { background: rgba(255,255,255,0.1); padding: 8px; border-radius: 8px; margin-bottom: 8px; }
         .range-slider { width: 100%; margin: 4px 0; accent-color: #ff7675; }
@@ -68,6 +69,13 @@
             background: #f1f2f6; display: flex; align-items: center; justify-content: center; overflow: hidden; cursor: pointer;
         }
         .avatar-preview-box img { width: 100%; height: 100%; object-fit: cover; }
+
+        /* 影片生成頁面的內部雙分頁系統（Tabs） */
+        .sub-tab-nav { display: flex; gap: 10px; margin-bottom: 15px; border-bottom: 2px solid #e4e7eb; padding-bottom: 8px; }
+        .sub-tab-btn { flex: 1; text-align: center; padding: 10px; font-weight: bold; font-size: 14px; cursor: pointer; color: #a4b0be; border-radius: 8px; }
+        .sub-tab-btn.active { background: #2f3542; color: white; }
+        .sub-tab-content { display: none; }
+        .sub-tab-content.active { display: block; }
 
         .timeline { display: flex; gap: 8px; overflow-x: auto; padding: 5px 0; margin-bottom: 10px; }
         .time-tag { background: #e4e7eb; padding: 8px 16px; font-size: 13px; font-weight: bold; cursor: pointer; white-space: nowrap; color: #57606f; }
@@ -81,19 +89,22 @@
         .diary-video-container { position: relative; width: 100%; height: 280px; background: #000; overflow: hidden; border-radius: 12px; }
         .diary-video { width: 100%; height: 100%; object-fit: cover; }
 
+        /* 完美複刻截圖排版位置（大時間置中靠上，在幹嘛緊跟在下） */
         .float-overlay-time-box {
-            position: absolute; top: 35px; left: 0; width: 100%; text-align: center; color: #ffffff; text-shadow: 0 2px 8px rgba(0,0,0,0.5); z-index: 10;
+            position: absolute; top: 35px; left: 0; width: 100%; text-align: center; color: #ffffff; text-shadow: 0 2px 8px rgba(0,0,0,0.6); z-index: 10; pointer-events: none;
         }
         .float-time-title { font-family: 'Lexend', sans-serif; font-size: 28px; font-weight: 800; letter-spacing: 1px; margin: 0; }
         .float-desc-title { font-size: 20px; font-weight: 700; margin-top: 2px; }
 
+        /* 左上角精緻透明浮動名牌（名字 + 自定義地區） */
         .float-profile-badge {
             position: absolute; top: 12px; left: 12px; display: flex; align-items: center; gap: 6px;
-            background: rgba(0, 0, 0, 0.25); padding: 4px 10px 4px 6px; border-radius: 20px; color: white; z-index: 11;
+            background: rgba(0, 0, 0, 0.3); padding: 4px 10px 4px 6px; border-radius: 20px; color: white; z-index: 11; pointer-events: none;
         }
         .float-badge-avatar { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; }
         .float-badge-name { font-size: 11px; font-weight: 700; }
 
+        /* 主導覽列 */
         .navbar {
             position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 480px; height: 65px;
             background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); display: flex; justify-content: space-around; align-items: center;
@@ -121,7 +132,7 @@
         <div class="card">
             <h3>🔑 個人與自定義地區</h3>
             <label>名字：</label>
-            <input type="text" id="userName" value="小畫家" onchange="saveProfileAndJoin()">
+            <input type="text" id="userName" value="" placeholder="請輸入名字" onchange="saveProfileAndJoin(); updateLivePreviewText();">
 
             <label>大頭貼：</label>
             <div class="avatar-uploader">
@@ -131,8 +142,8 @@
                 <input type="file" id="avatarFileInput" accept="image/*" style="display: none;" onchange="handleAvatarFile(this)">
             </div>
 
-            <label>📍 目前所在地區（可自行修改或增加 Emoji）：</label>
-            <input type="text" id="userRegion" value="🇹🇼 台灣" placeholder="例如：🇯🇵 東京、🇺🇸 洛杉磯" onchange="saveProfileAndJoin()">
+            <label>📍 目前所在地區：</label>
+            <input type="text" id="userRegion" value="🇹🇼 台灣" placeholder="可自由修改地區或 Emoji" onchange="saveProfileAndJoin(); updateLivePreviewText();">
 
             <label>房間代碼：</label>
             <input type="text" id="roomCode" value="ABC99" onchange="saveProfileAndJoin()">
@@ -144,7 +155,7 @@
         <div class="card">
             <h3>🕒 當地時段發布</h3>
             <label>當地時間：</label>
-            <select id="currentHour" onchange="syncInputText()">
+            <select id="currentHour" onchange="syncInputText(); updateLivePreviewText();">
                 <script>
                     for(let i=0; i<24; i++) {
                         let h = (i<10?'0':'')+i+':00';
@@ -154,7 +165,7 @@
             </select>
             
             <label>當下在幹嘛（狀態文字）：</label>
-            <input type="text" id="statusText" placeholder="例如：跳舞課、早餐、月中吃早餐...">
+            <input type="text" id="statusText" placeholder="" oninput="updateLivePreviewText()">
             
             <label>添加影片：</label>
             <div class="upload-options-group">
@@ -166,8 +177,19 @@
             <input type="file" id="fileVideoInput" accept="video/*" style="display: none;" onchange="prepareVideoEditor(this)">
 
             <div id="editorBox">
-                <p style="font-size: 13px; color: #2f3542; font-weight: bold;">✂️ 拆遷微調工作區：</p>
-                <div class="video-container-wrapper"><video id="uploadVideoPreview" loop muted playsinline></video></div>
+                <p style="font-size: 13px; color: #fff; font-weight: bold; margin-bottom: 8px;">✂️ 畫面即時對齊效果預覽：</p>
+                <div class="video-container-wrapper">
+                    <div class="float-overlay-time-box">
+                        <div class="float-time-title" id="previewTimeLabel">10:00</div>
+                        <div class="float-desc-title" id="previewTextLabel"></div>
+                    </div>
+                    <div class="float-profile-badge">
+                        <img class="float-badge-avatar" id="previewAvatarLabel" src="data:image/svg+xml;utf8,<svg viewBox='0 0 24 24' fill='%23a4b0be'><path d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z'/></svg>">
+                        <span class="float-badge-name" id="previewNameRegionLabel">🇹🇼 台灣</span>
+                    </div>
+                    <video id="uploadVideoPreview" loop muted playsinline></video>
+                </div>
+                
                 <div class="range-control-group">
                     <label style="color:#fff; font-size:11px;">⏱️ 2秒精采起點: <span id="timeVal">0.0s</span></label>
                     <input type="range" id="timeOffsetSlider" class="range-slider" min="0" max="10" step="0.1" value="0" oninput="updateVideoCropPreview()">
@@ -184,18 +206,34 @@
     </div>
 
     <div id="page3" class="tab-content">
-        <div class="card">
-            <h3>👀 世界時間動態線</h3>
-            <div class="timeline" id="timelineContainer"></div>
-            <div id="friendStatusArea"></div>
+        <div class="sub-tab-nav">
+            <div class="sub-tab-btn active" id="subTab1Btn" onclick="switchSubTab(0)">🕒 單一時段</div>
+            <div class="sub-tab-btn" id="subTab2Btn" onclick="switchSubTab(1)">🍿 24小時大片</div>
         </div>
 
-        <div class="card">
-            <h3>🎬 唯美直式 2x2 四宮格合體縮時</h3>
-            <button onclick="renderCuteVideo()" style="background: #2f3542;">🔥 生成直式 2x2 四宮格影片</button>
-            <canvas id="canvasStage" width="540" height="960"></canvas>
-            <div id="outputArea" style="margin-top: 15px; text-align: center;"></div>
+        <div id="subTabContent1" class="sub-tab-content active">
+            <div class="card">
+                <h3>👀 挑選時段看大家在幹嘛</h3>
+                <div class="timeline" id="timelineContainer"></div>
+                <div id="friendStatusArea"></div>
+            </div>
+            <div class="card">
+                <h3>🎬 当前单一时段四宫格合成</h3>
+                <button onclick="renderCuteVideo(false)" style="background: #2f3542;">🔥 生成該時段四宮格影片</button>
+                <div id="singleOutputArea" style="margin-top: 15px; text-align: center;"></div>
+            </div>
         </div>
+
+        <div id="subTabContent2" class="sub-tab-content">
+            <div class="card">
+                <h3>🍿 全天 24 小時 • 終極串聯縮時大片</h3>
+                <p style="font-size: 13px; color: #747d8c; text-align: center;">此區會將今天所有有發布的時段，自動串接成一支連續播放的 24h 精彩大片。</p>
+                <button onclick="renderCuteVideo(true)" style="background: #2ed573; color: white;">🎬 一鍵生成 24H 終極大片</button>
+                <div id="megaOutputArea" style="margin-top: 15px; text-align: center;"></div>
+            </div>
+        </div>
+
+        <canvas id="canvasStage" width="540" height="960"></canvas>
     </div>
 
     <div class="navbar">
@@ -234,9 +272,11 @@
             if(localStorage.getItem("mini2s_customAvatar")) {
                 userAvatarBase64 = localStorage.getItem("mini2s_customAvatar");
                 document.getElementById("avatarImage").src = userAvatarBase64;
+                document.getElementById("previewAvatarLabel").src = userAvatarBase64;
             }
             megaDB = localStorage.getItem("mini2s_megaDB") ? JSON.parse(localStorage.getItem("mini2s_megaDB")) : {};
             syncInputText();
+            updateLivePreviewText();
         };
 
         function initDateHours() { let obj = {}; fullDayHours.forEach(h => obj[h] = {}); return obj; }
@@ -247,9 +287,21 @@
             reader.onload = function(e) {
                 userAvatarBase64 = e.target.result;
                 document.getElementById("avatarImage").src = userAvatarBase64;
+                document.getElementById("previewAvatarLabel").src = userAvatarBase64;
                 localStorage.setItem("mini2s_customAvatar", userAvatarBase64);
             };
             reader.readAsDataURL(file);
+        }
+
+        function updateLivePreviewText() {
+            const h = document.getElementById("currentHour").value;
+            const txt = document.getElementById("statusText").value || "";
+            const uName = document.getElementById("userName").value || "";
+            const reg = document.getElementById("userRegion").value || "🇹🇼 台灣";
+
+            document.getElementById("previewTimeLabel").innerText = h;
+            document.getElementById("previewTextLabel").innerText = txt;
+            document.getElementById("previewNameRegionLabel").innerText = uName ? `${uName} ${reg}` : reg;
         }
 
         function prepareVideoEditor(input) {
@@ -267,6 +319,7 @@
                     document.getElementById("editorBox").style.display = "block";
                     document.getElementById('timerStatus').innerText = "✨ 請調整精采內容起點與畫面中心！";
                     updateVideoCropPreview();
+                    updateLivePreviewText();
                 };
             };
             reader.readAsDataURL(file);
@@ -288,7 +341,7 @@
 
             const date = document.getElementById('diaryDate').value;
             const hour = document.getElementById('currentHour').value;
-            const uName = document.getElementById("userName").value;
+            const uName = document.getElementById("userName").value || "未命名";
             const rCode = document.getElementById("roomCode").value;
             const reg = document.getElementById("userRegion").value;
             const dateDB = getActiveDateDB();
@@ -308,9 +361,21 @@
                     timeStart: dateDB[hour][uName].timeStart, yAlign: dateDB[hour][uName].yAlign, region: reg
                 });
             }
-            document.getElementById('timerStatus').innerText = "🚀 發布成功！";
+
+            alert("🎉 新增完成！");
+            clearPublishPage();
+        }
+
+        function clearPublishPage() {
+            document.getElementById('statusText').value = "";
             document.getElementById("editorBox").style.display = "none";
+            document.getElementById('timerStatus').innerText = "";
+            document.getElementById('cameraVideoInput').value = "";
+            document.getElementById('fileVideoInput').value = "";
             currentRawVideoSrc = "";
+            const videoEl = document.getElementById("uploadVideoPreview");
+            videoEl.removeAttribute("src");
+            videoEl.load();
         }
 
         function saveProfileAndJoin() {
@@ -325,8 +390,22 @@
 
         function handleDateChange() { syncInputText(); if (document.querySelector('.nav-item.active').id === "nav3") refreshTimelineUI(); }
         function getActiveDateDB() { const date = document.getElementById('diaryDate').value; if(!megaDB[date]) megaDB[date] = initDateHours(); return megaDB[date]; }
-        function syncInputText() { const hour = document.getElementById('currentHour').value; const uName = document.getElementById("userName").value; const dateDB = getActiveDateDB(); document.getElementById('statusText').value = (dateDB[hour] && dateDB[hour][uName]) ? dateDB[hour][uName].text : ""; }
-        function switchTab(tabIndex) { document.querySelectorAll('.tab-content').forEach(p => p.classList.remove('active')); document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active')); document.querySelectorAll('.tab-content')[tabIndex].classList.add('active'); document.querySelectorAll('.nav-item')[tabIndex].classList.add('active'); if(tabIndex === 2) refreshTimelineUI(); }
+        function syncInputText() { const hour = document.getElementById('currentHour').value; const uName = document.getElementById("userName").value || "未命名"; const dateDB = getActiveDateDB(); document.getElementById('statusText').value = (dateDB[hour] && dateDB[hour][uName]) ? dateDB[hour][uName].text : ""; }
+        
+        function switchTab(tabIndex) { 
+            document.querySelectorAll('.tab-content').forEach(p => p.classList.remove('active')); 
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active')); 
+            document.querySelectorAll('.tab-content')[tabIndex].classList.add('active'); 
+            document.querySelectorAll('.nav-item')[tabIndex].classList.add('active'); 
+            if(tabIndex === 2) refreshTimelineUI(); 
+        }
+
+        function switchSubTab(subTabIndex) {
+            document.querySelectorAll('.sub-tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.sub-tab-content').forEach(c => c.classList.remove('active'));
+            document.querySelectorAll('.sub-tab-btn')[subTabIndex].classList.add('active');
+            document.querySelectorAll('.sub-tab-content')[subTabIndex].classList.add('active');
+        }
 
         function refreshTimelineUI() {
             const container = document.getElementById('timelineContainer'); container.innerHTML = '';
@@ -343,7 +422,7 @@
 
         function showHourDetails(hour) {
             const area = document.getElementById('friendStatusArea'); area.innerHTML = '';
-            const dateDB = getActiveDateDB(); const uName = document.getElementById("userName").value;
+            const dateDB = getActiveDateDB(); const uName = document.getElementById("userName").value || "未命名";
             const users = new Set([uName]); if(dateDB[hour]) Object.keys(dateDB[hour]).forEach(u => users.add(u));
 
             users.forEach(user => {
@@ -372,26 +451,38 @@
             });
         }
 
-        async function renderCuteVideo() {
+        async function renderCuteVideo(isFullDay = false) {
             const canvas = document.getElementById('canvasStage'); const ctx = canvas.getContext('2d');
-            const outputArea = document.getElementById('outputArea'); const dateDB = getActiveDateDB();
-            const myCurrentName = document.getElementById("userName").value;
+            const outputArea = isFullDay ? document.getElementById('megaOutputArea') : document.getElementById('singleOutputArea'); 
+            const dateDB = getActiveDateDB();
+            const myCurrentName = document.getElementById("userName").value || "未命名";
 
-            const activeHours = Object.keys(dateDB).filter(h => Object.keys(dateDB[h]).some(u => dateDB[h][u] && dateDB[h][u].video)).sort();
-            if(activeHours.length === 0) { outputArea.innerHTML = "<p style='color:#2f3542;font-weight:bold;'>❌ 今天還沒有任何影片動態唷！</p>"; return; }
+            let activeHours = Object.keys(dateDB).filter(h => Object.keys(dateDB[h]).some(u => dateDB[h][u] && dateDB[h][u].video)).sort();
+            
+            if(!isFullDay) {
+                const currentActiveTag = document.querySelector('.time-tag.active');
+                const selectedHour = currentActiveTag ? currentActiveTag.innerText : "10:00";
+                activeHours = [selectedHour];
+            }
+
+            if(activeHours.length === 0 || (activeHours.length === 1 && !isFullDay && Object.keys(dateDB[activeHours[0]] || {}).length === 0)) { 
+                outputArea.innerHTML = "<p style='color:#2f3542;font-weight:bold;'>❌ 該選取範圍內沒有任何影片動態唷！</p>"; 
+                return; 
+            }
 
             canvas.style.display = 'block';
-            outputArea.innerHTML = "<p style='color:#747d8c;'>⏳ 正在合成滿版直式四宮格影片...</p>";
+            outputArea.innerHTML = `<p style='color:#747d8c;'>⏳ 正在合成中，請稍候...</p>`;
 
             const stream = canvas.captureStream(24);
             const recorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
             let chunks = []; recorder.ondataavailable = (e) => chunks.push(e.data);
             recorder.onstop = () => {
                 const blob = new Blob(chunks, { type: 'video/mp4' }); const url = URL.createObjectURL(blob);
+                const titleText = isFullDay ? "24H 終極連線大片" : "單一時段四宮格";
                 outputArea.innerHTML = `
-                    <p style="color:#2ed573; font-weight:bold;">🎉 直式四宮格連線影片生成成功！</p>
+                    <p style="color:#2ed573; font-weight:bold;">🎉 ${titleText}影片生成成功！</p>
                     <video src="${url}" controls autoplay style="width:100%; max-width:320px; border-radius:12px; margin-top:10px;"></video>
-                    <a href="${url}" download="Diary_四宮格日記.mp4" style="color:#2f3542; text-decoration:none; font-weight:bold; display:block; margin-top:8px;">📥 下載直式影片 MP4</a>`;
+                    <a href="${url}" download="Diary_${titleText}.mp4" style="color:#2f3542; text-decoration:none; font-weight:bold; display:block; margin-top:8px;">📥 下載影片 MP4</a>`;
             };
             recorder.start();
 
@@ -402,23 +493,18 @@
             const loadedAvatars = {};
             for (let u of userList) {
                 let src = "data:image/svg+xml;utf8,<svg viewBox='0 0 24 24' fill='%23a4b0be'><path d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z'/></svg>";
-                for (let h of activeHours) { if (dateDB[h][u] && dateDB[h][u].avatar) { src = dateDB[h][u].avatar; break; } }
+                for (let h of activeHours) { if (dateDB[h] && dateDB[h][u] && dateDB[h][u].avatar) { src = dateDB[h][u].avatar; break; } }
                 const img = new Image(); img.src = src; await new Promise(r => img.onload = r); loadedAvatars[u] = img;
             }
 
             const cellW = canvas.width / 2;
             const cellH = canvas.height / 2;
-            const gridCoords = [
-                { x: 0, y: 0 },
-                { x: cellW, y: 0 },
-                { x: 0, y: cellH },
-                { x: cellW, y: cellH }
-            ];
+            const gridCoords = [{ x: 0, y: 0 }, { x: cellW, y: 0 }, { x: 0, y: cellH }, { x: cellW, y: cellH }];
 
             for (let h of activeHours) {
                 const vElements = {};
                 for (let u of userList) {
-                    if (dateDB[h][u] && dateDB[h][u].video) {
+                    if (dateDB[h] && dateDB[h][u] && dateDB[h][u].video) {
                         const v = document.createElement('video'); v.src = dateDB[h][u].video; v.muted = true; v.playsInline = true;
                         v.currentTime = dateDB[h][u].timeStart || 0; v.play(); vElements[u] = v;
                     }
@@ -431,7 +517,7 @@
                     for (let i = 0; i < 4; i++) {
                         const u = userList[i]; if (!u) continue;
                         const coord = gridCoords[i];
-                        const uData = dateDB[h][u];
+                        const uData = dateDB[h] ? dateDB[h][u] : null;
 
                         ctx.save();
                         ctx.beginPath(); ctx.rect(coord.x, coord.y, cellW, cellH); ctx.clip();
@@ -439,28 +525,24 @@
                         if (uData && uData.video && vElements[u]) {
                             const video = vElements[u];
                             const yPercent = (uData.yAlign || 50) / 100;
+                            
                             ctx.drawImage(video, coord.x - (cellH - cellW)/2, coord.y - (cellH - cellW)*yPercent, cellH, cellH);
-
-                            ctx.fillStyle = "rgba(0, 0, 0, 0.15)";
-                            ctx.fillRect(coord.x, coord.y, cellW, cellH);
+                            ctx.fillStyle = "rgba(0, 0, 0, 0.12)"; ctx.fillRect(coord.x, coord.y, cellW, cellH);
 
                             ctx.fillStyle = "#ffffff"; ctx.textAlign = "center";
                             ctx.shadowColor = "rgba(0,0,0,0.6)"; ctx.shadowBlur = 8;
                             
-                            // 頂部時間
                             ctx.font = "800 32px 'Lexend', sans-serif";
                             ctx.fillText(h, coord.x + cellW / 2, coord.y + 65);
                             
-                            // 在幹嘛文字
                             ctx.font = "bold 20px sans-serif";
                             ctx.fillText(uData.text, coord.x + cellW / 2, coord.y + 105);
                             ctx.shadowBlur = 0;
 
-                            // 左上角名牌
                             const regionDisplay = uData.region || "";
                             const bx = coord.x + 12; const by = coord.y + 12;
                             
-                            ctx.fillStyle = "rgba(0, 0, 0, 0.25)";
+                            ctx.fillStyle = "rgba(0, 0, 0, 0.3)";
                             ctx.beginPath(); ctx.roundRect(bx, by, 125, 26, 13); ctx.fill();
 
                             if (loadedAvatars[u]) {
