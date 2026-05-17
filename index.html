@@ -178,11 +178,30 @@ const today=new Date();const twOffset=8*60*60*1000;const localTime=new Date(toda
 document.getElementById('diaryDate').value=localTime.toISOString().split('T')[0];
 if(localStorage.getItem("mini2s_myRoomList"))myRoomList=JSON.parse(localStorage.getItem("mini2s_myRoomList"));
 if(localStorage.getItem("mini2s_roomEmptySettings"))roomEmptySettings=JSON.parse(localStorage.getItem("mini2s_roomEmptySettings"));
+
+// 初始化時詢問通知權限
+if("Notification" in window && Notification.permission==="default"){
+Notification.requestPermission();
+}
+
 socket=io();
 socket.on('connect',()=>{saveProfileAndJoin();});
 socket.on('room-members-update',(data)=>{
-globalCachedMembers=data.members||[];const activeRoom=document.getElementById("activeRoomSelect").value;
-if(data.roomCode===activeRoom)renderRoomMembersUI(globalCachedMembers);
+const oldLength = globalCachedMembers.length;
+const myName=document.getElementById("userName").value||"未命名";
+globalCachedMembers=data.members||[];
+const activeRoom=document.getElementById("activeRoomSelect").value;
+
+// 邏輯優化：比對是否有新成員加入，並觸發通知
+if(data.roomCode===activeRoom){
+renderRoomMembersUI(globalCachedMembers);
+if(globalCachedMembers.length > oldLength && oldLength > 0){
+  const latestMember = globalCachedMembers[globalCachedMembers.length - 1];
+  if(latestMember && latestMember.userName !== myName){
+	triggerAppNotification("🏡 新成員加入房間", `【${latestMember.userName}】剛剛進入了房間 [${data.roomCode}]！`);
+  }
+}
+}
 if(currentSelectedRoomCode===data.roomCode)renderSelectedRoomMembersOnly(globalCachedMembers);
 });
 socket.on('update-room-empty-status',(data)=>{
@@ -194,6 +213,13 @@ updateLivePublishGrid();refreshWatchGridUI();
 });
 socket.on('new-diary-broadcast',(data)=>{
 const d=data.date;const h=data.hour;const u=data.userName;const r=data.roomCode;
+const myName=document.getElementById("userName").value||"未命名";
+
+// 邏輯優化：如果不是自己發布的，且有新影片資料，跳出APP通知彈窗
+if(u !== myName && data.video){
+triggerAppNotification("🕒 朋友更新了動態！", `房間 [${r}] 的【${u}】剛剛發布了 ${h} 的日常動態！`);
+}
+
 if(!megaDB[d])megaDB[d]=initDateHours();if(!megaDB[d][h])megaDB[d][h]={};if(!megaDB[d][h][r])megaDB[d][h][r]={};
 megaDB[d][h][r][u]={text:data.text,avatar:data.avatar,video:data.video,timeStart:0,yAlign:50,region:data.region||"🇹🇼 台灣"};
 localStorage.setItem("mini2s_megaDB",JSON.stringify(megaDB));
@@ -205,6 +231,18 @@ if(localStorage.getItem("mini2s_customAvatar")){userAvatarBase64=localStorage.ge
 megaDB=localStorage.getItem("mini2s_megaDB")?JSON.parse(localStorage.getItem("mini2s_megaDB")):{};
 updateRoomSelectOptions();saveProfileAndJoin();updateLivePublishGrid();syncInputText();
 };
+
+// 網頁版 APP 推播通知核心函數
+function triggerAppNotification(title, bodyText){
+if(!("Notification" in window)) return;
+if(Notification.permission === "granted"){
+new Notification(title, {
+  body: bodyText,
+  icon: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%232f3542"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>'
+});
+}
+}
+
 function initDateHours(){let obj={};fullDayHours.forEach(h=>obj[h]={});return obj;}
 function handleAvatarFile(input){
 const file=input.files[0];if(!file)return;const reader=new FileReader();
