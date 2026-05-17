@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
@@ -8,7 +9,7 @@
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght=400;700&family=Lexend:wght=600;800&display=swap');
 *{font-family:'Noto Sans TC','Microsoft JhengHei',sans-serif;border-radius:16px;box-sizing:border-box;transition:all 0.2s ease;}
-body{background-color:#f5f6fa;color:#2f3542;max-width:480px;margin:0 auto;padding:20px 20px 90px 20px;}
+body{background-color:#f5f6fa;color:#2f3542;max-width:480px;margin:0 auto;padding:20px 20px 90px 20px;position:relative;}
 h1,h3{color:#2f3542;text-align:center;margin-bottom:20px;font-weight:700;letter-spacing:0.5px;}
 .date-selector-box{background:#ffffff;border:1px solid #e4e7eb;padding:10px;margin-bottom:15px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,0.02);}
 .date-picker-input{width:auto;display:inline-block;padding:5px 10px;margin-left:5px;border:2px solid #2f3542;background:#fff;font-weight:bold;color:#2f3542;font-size:14px;outline:none;}
@@ -50,6 +51,9 @@ button:hover{background:#57606f;}
 .tab-content{display:none;}
 .tab-content.active{display:block;}
 #canvasStage{display:none !important;}
+
+/* 右下角版本顯示標籤 */
+.version-badge {position: fixed; bottom: 80px; right: 20px; background: #2f3542; color: #fff; padding: 6px 12px; font-size: 11px; font-weight: bold; opacity: 0.8; z-index: 9999; pointer-events: none; box-shadow: 0 2px 8px rgba(0,0,0,0.15);}
 </style>
 </head>
 <body>
@@ -168,6 +172,8 @@ document.write(`<option value="${h}" ${i===10?'selected':''}>${h}</option>`);
 </div>
 </div>
 
+<div class="version-badge">更新 1.0</div>
+
 <div class="navbar">
 <div class="nav-item active" id="nav1" onclick="switchTab(0)">🔑 設定</div>
 <div class="nav-item" id="nav2" onclick="switchTab(1)">🕒 發布日常</div>
@@ -190,6 +196,8 @@ document.getElementById('diaryDate').value = `${yyyy}-${mm}-${dd}`;
 
 if(localStorage.getItem("mini2s_myRoomList"))myRoomList=JSON.parse(localStorage.getItem("mini2s_myRoomList"));
 if(localStorage.getItem("mini2s_roomEmptySettings"))roomEmptySettings=JSON.parse(localStorage.getItem("mini2s_roomEmptySettings"));
+
+megaDB=localStorage.getItem("mini2s_megaDB")?JSON.parse(localStorage.getItem("mini2s_megaDB")):{};
 
 socket=io();
 socket.on('connect',()=>{
@@ -219,21 +227,27 @@ updateLivePublishGrid();refreshWatchGridUI();
 }
 });
 
+// ⭐ 核心修正：收到別人的廣播時，百分之百存入自己手機的 megaDB，確保雙向完全同步！
 socket.on('new-diary-broadcast',(data)=>{
 const d=data.date;const h=data.hour;const u=data.userName;const r=data.roomCode;
 if(!megaDB[d])megaDB[d]=initDateHours();if(!megaDB[d][h])megaDB[d][h]={};if(!megaDB[d][h][r])megaDB[d][h][r]={};
 
-// 保存完整的廣播資料，包含對方的座位號碼！
-megaDB[d][h][r][u]={
-  text:data.text,
-  avatar:data.avatar,
-  video:data.video,
-  timeStart:0,
-  yAlign:50,
-  region:data.region||"🇹🇼 台灣",
-  seatNo:data.seatNo
-};
+if(data.text === "" && data.video === "") {
+  delete megaDB[d][h][r][u];
+} else {
+  megaDB[d][h][r][u]={
+	text:data.text,
+	avatar:data.avatar,
+	video:data.video,
+	timeStart:0,
+	yAlign:50,
+	region:data.region||"",
+	seatNo:data.seatNo
+  };
+}
 localStorage.setItem("mini2s_megaDB",JSON.stringify(megaDB));
+
+// 收到新動態，不管在哪個頁面都即時刷新畫面
 updateLivePublishGrid();
 refreshWatchGridUI();
 renderManagementPageUI();
@@ -242,7 +256,6 @@ renderManagementPageUI();
 if(localStorage.getItem("mini2s_userName"))document.getElementById("userName").value=localStorage.getItem("mini2s_userName");
 if(localStorage.getItem("mini2s_userRegion"))document.getElementById("userRegion").value=localStorage.getItem("mini2s_userRegion");
 if(localStorage.getItem("mini2s_customAvatar")){userAvatarBase64=localStorage.getItem("mini2s_customAvatar");document.getElementById("avatarImage").src=userAvatarBase64;}
-megaDB=localStorage.getItem("mini2s_megaDB")?JSON.parse(localStorage.getItem("mini2s_megaDB")):{};
 
 updateRoomSelectOptions();
 if(myRoomList.length > 0) handleActiveRoomToggle();
@@ -256,19 +269,16 @@ reader.readAsDataURL(file);
 }
 function getActiveDateDB(){const date=document.getElementById('diaryDate').value;if(!megaDB[date])megaDB[date]=initDateHours();return megaDB[date];}
 
-// ⭐ 終極修正：結合「在線座位」與「已發布歷史座位」，確保斷線或換時段影片也絕不隱形！
 function GetSeatUserArrayByHour(hour, roomCode){
 let seats = [null, null, null, null];
 const dateDB = getActiveDateDB();
 
-// 1. 先用當前在線的名單填入座位
 globalCachedMembers.forEach(m => {
   if(m.seatNo >= 1 && m.seatNo <= 4) {
 	seats[m.seatNo - 1] = m.userName;
   }
 });
 
-// 2. 如果該時段有發布過歷史影片的人，就算中途斷線了，也強制把他拉回他當時發布的座位上
 if(dateDB[hour] && dateDB[hour][roomCode]){
   Object.keys(dateDB[hour][roomCode]).forEach(u => {
 	const uData = dateDB[hour][roomCode][u];
@@ -280,7 +290,6 @@ if(dateDB[hour] && dateDB[hour][roomCode]){
 return seats;
 }
 
-// 獲取當前自己的座位號碼
 function getMySeatNo(){
 const myName = document.getElementById("userName").value || "未命名";
 const found = globalCachedMembers.find(m => m.userName === myName);
@@ -288,7 +297,7 @@ return found ? found.seatNo : 1;
 }
 
 function addNewRoomCodeAction(){
-const code=document.getElementById("roomCode").value.trim();if(!code)return alert("請輸入房間代碼！");
+const code=document.getElementById("roomCode").value.trim();if(!code)return;
 if(!myRoomList.includes(code)){myRoomList.push(code);localStorage.setItem("mini2s_myRoomList",JSON.stringify(myRoomList));}
 updateRoomSelectOptions();document.getElementById("activeRoomSelect").value=code;handleActiveRoomToggle();saveProfileAndJoin();switchTab(1);
 }
@@ -327,7 +336,7 @@ container.innerHTML+=`<div style="display:flex;align-items:center;gap:10px;margi
 });
 }
 function broadcastCustomEmptyStatus(){
-if(!currentSelectedRoomCode)return;const inputVal=document.getElementById("customEmptyStatusInput").value.trim();if(!inputVal)return alert("請輸入狀態符號！");
+if(!currentSelectedRoomCode)return;const inputVal=document.getElementById("customEmptyStatusInput").value.trim();if(!inputVal)return;
 if(socket&&socket.connected){socket.emit('change-room-empty-status',{roomCode:currentSelectedRoomCode,statusText:inputVal});document.getElementById("customEmptyStatusInput").value="";}
 }
 function deleteAndExitRoomFromList(){
@@ -367,7 +376,7 @@ const date=document.getElementById('diaryDate').value;const myName=document.getE
 if(dateDB[hour]&&dateDB[hour][roomCode]&&dateDB[hour][roomCode][myName]){
 delete dateDB[hour][roomCode][myName];localStorage.setItem("mini2s_megaDB",JSON.stringify(megaDB));
 if(socket&&socket.connected){socket.emit('share-diary',{roomCode:roomCode,userName:myName,date:date,hour:hour,text:"",avatar:"",video:"",timeStart:0,yAlign:50,region:"",seatNo:1});}
-alert("已成功刪除！");renderManagementPageUI();updateLivePublishGrid();
+renderManagementPageUI();updateLivePublishGrid();
 }
 }
 
@@ -382,16 +391,16 @@ for(let i=0; i<4; i++){
 const user=seatUsers[i];const cell=document.createElement("div");cell.className="grid-cell";
 if(user===myName){
 if(currentRawVideoSrc){
-cell.innerHTML=`<div class="cell-overlay-time-box"><div class="cell-time-title">${hour}</div><div class="cell-desc-title">${text}</div></div><div class="cell-profile-badge"><img class="cell-badge-avatar" src="${userAvatarBase64||'data:image/svg+xml;utf8,<svg viewBox=\'0 0 24 24\' fill=\'%23a4b0be\'><path d=\'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z\'/></svg>'}"><span class="cell-badge-name">${myName} (${i+1}) ${reg}</span></div><video class="grid-cell-video" id="liveEditVideoRef" loop muted playsinline src="${currentRawVideoSrc}"></video>`;
+cell.innerHTML=`<div class="cell-overlay-time-box"><div class="cell-time-title">${hour}</div><div class="cell-desc-title">${text}</div></div><div class="cell-profile-badge"><img class="cell-badge-avatar" src="${userAvatarBase64||'data:image/svg+xml;utf8,<svg viewBox=\'0 0 24 24\' fill=\'%23a4b0be\'><path d=\'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z\'/></svg>'}"><span class="cell-badge-name">${myName} ${reg}</span></div><video class="grid-cell-video" id="liveEditVideoRef" loop muted playsinline src="${currentRawVideoSrc}"></video>`;
 }else if(dateDB[hour]&&dateDB[hour][activeRoom]&&dateDB[hour][activeRoom][myName]&&dateDB[hour][activeRoom][myName].video){
 const uData=dateDB[hour][activeRoom][myName];
-cell.innerHTML=`<div class="cell-overlay-time-box"><div class="cell-time-title">${hour}</div><div class="cell-desc-title">${uData.text}</div></div><div class="cell-profile-badge"><img class="cell-badge-avatar" src="${userAvatarBase64||'data:image/svg+xml;utf8,<svg viewBox=\'0 0 24 24\' fill=\'%23a4b0be\'><path d=\'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z\'/></svg>'}"><span class="cell-badge-name">${myName} (${i+1}) ${reg}</span></div><video class="grid-cell-video" loop autoplay muted playsinline src="${uData.video}"></video>`;
+cell.innerHTML=`<div class="cell-overlay-time-box"><div class="cell-time-title">${hour}</div><div class="cell-desc-title">${uData.text}</div></div><div class="cell-profile-badge"><img class="cell-badge-avatar" src="${userAvatarBase64||'data:image/svg+xml;utf8,<svg viewBox=\'0 0 24 24\' fill=\'%23a4b0be\'><path d=\'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z\'/></svg>'}"><span class="cell-badge-name">${myName} ${reg}</span></div><video class="grid-cell-video" loop autoplay muted playsinline src="${uData.video}"></video>`;
 }else{
 cell.innerHTML=`<div class="cell-empty-placeholder"><div class="cell-empty-time">${hour}</div><span style="font-size:24px;margin-bottom:5px;">${activeRoomEmptyPlaceholder}</span><span style="font-size:11px;font-weight:bold;">👉 (${i+1}) 點上方添加影片</span></div>`;
 }
 }else if(user&&dateDB[hour]&&dateDB[hour][activeRoom]&&dateDB[hour][activeRoom][user]&&dateDB[hour][activeRoom][user].video){
 const uData=dateDB[hour][activeRoom][user];
-cell.innerHTML=`<div class="cell-overlay-time-box"><div class="cell-time-title">${hour}</div><div class="cell-desc-title">${uData.text}</div></div><div class="cell-profile-badge"><img class="cell-badge-avatar" src="${uData.avatar||'data:image/svg+xml;utf8,<svg viewBox=\'0 0 24 24\' fill=\'%23a4b0be\'><path d=\'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z\'/></svg>'}"><span class="cell-badge-name">${user} (${i+1}) ${uData.region||""}</span></div><video class="grid-cell-video" loop autoplay muted playsinline src="${uData.video}"></video>`;
+cell.innerHTML=`<div class="cell-overlay-time-box"><div class="cell-time-title">${hour}</div><div class="cell-desc-title">${uData.text}</div></div><div class="cell-profile-badge"><img class="cell-badge-avatar" src="${uData.avatar||'data:image/svg+xml;utf8,<svg viewBox=\'0 0 24 24\' fill=\'%23a4b0be\'><path d=\'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z\'/></svg>'}"><span class="cell-badge-name">${user} ${uData.region||""}</span></div><video class="grid-cell-video" loop autoplay muted playsinline src="${uData.video}"></video>`;
 }else{
 cell.innerHTML=`<div class="cell-empty-placeholder"><div class="cell-empty-time">${hour}</div><span style="font-size:24px;">${activeRoomEmptyPlaceholder}</span><span style="font-size:10px;color:rgba(255,255,255,0.15)">位置 (${i+1})</span></div>`;
 }
@@ -408,22 +417,21 @@ reader.readAsDataURL(file);
 }
 
 function submitDiaryToServer(){
-const textInput=document.getElementById('statusText').value;if(!textInput||!currentRawVideoSrc)return alert("請填寫狀態並選擇影片唷！🎬");
+const textInput=document.getElementById('statusText').value;if(!textInput||!currentRawVideoSrc)return;
 const date=document.getElementById('diaryDate').value;const hour=document.getElementById('currentHour').value;const uName=document.getElementById("userName").value||"未命名";
 const activeRoom=document.getElementById("activeRoomSelect").value;const reg=document.getElementById("userRegion").value;
-if(!activeRoom)return alert("你目前沒有在任何房間中！");const dateDB=getActiveDateDB();
+if(!activeRoom)return;const dateDB=getActiveDateDB();
 
-const mySeat = getMySeatNo(); // 抓取自己當下的座位號
+const mySeat = getMySeatNo();
 
 if(!dateDB[hour][activeRoom])dateDB[hour][activeRoom]={};
 dateDB[hour][activeRoom][uName]={text:textInput,avatar:userAvatarBase64,video:currentRawVideoSrc,timeStart:0,yAlign:50,region:reg,seatNo:mySeat};
 localStorage.setItem("mini2s_megaDB",JSON.stringify(megaDB));
 
 if(socket&&socket.connected){
-  // 發送時連同座位號碼(seatNo)一起廣播給所有人
   socket.emit('share-diary',{roomCode:activeRoom,userName:uName,date:date,hour:hour,text:textInput,avatar:userAvatarBase64,video:currentRawVideoSrc,timeStart:0,yAlign:50,region:reg,seatNo:mySeat});
 }
-setTimeout(()=>{alert("新增完成！🎉");clearPublishPage();},300);
+setTimeout(()=>{clearPublishPage();},300);
 }
 
 function clearPublishPage(){
@@ -441,7 +449,7 @@ for(let i=0;i<4;i++){
 const user=seatUsers[i];const cell=document.createElement("div");cell.className="grid-cell";
 if(user&&dateDB[hour]&&dateDB[hour][watchRoom]&&dateDB[hour][watchRoom][user]&&dateDB[hour][watchRoom][user].video){
 const uData=dateDB[hour][watchRoom][user];
-cell.innerHTML=`<div class="cell-overlay-time-box"><div class="cell-time-title">${hour}</div><div class="cell-desc-title">${uData.text}</div></div><div class="cell-profile-badge"><img class="cell-badge-avatar" src="${uData.avatar||'data:image/svg+xml;utf8,<svg viewBox=\'0 0 24 24\' fill=\'%23a4b0be\'><path d=\'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z\'/></svg>'}"><span class="cell-badge-name">${user} (${i+1}) ${uData.region||""}</span></div><video class="grid-cell-video" loop autoplay muted playsinline src="${uData.video}"></video>`;
+cell.innerHTML=`<div class="cell-overlay-time-box"><div class="cell-time-title">${hour}</div><div class="cell-desc-title">${uData.text}</div></div><div class="cell-profile-badge"><img class="cell-badge-avatar" src="${uData.avatar||'data:image/svg+xml;utf8,<svg viewBox=\'0 0 24 24\' fill=\'%23a4b0be\'><path d=\'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z\'/></svg>'}"><span class="cell-badge-name">${user} ${uData.region||""}</span></div><video class="grid-cell-video" loop autoplay muted playsinline src="${uData.video}"></video>`;
 }else{
 cell.innerHTML=`<div class="cell-empty-placeholder"><div class="cell-empty-time">${hour}</div><span style="font-size:24px;">${activePlaceholder}</span></div>`;
 }
@@ -471,7 +479,7 @@ if(tabIndex===1)handleActiveRoomToggle();if(tabIndex===2)refreshWatchGridUI();if
 
 async function renderMegaFullDayVideo(){
 const canvas=document.getElementById('canvasStage');const ctx=canvas.getContext('2d');const outputArea=document.getElementById('megaOutputArea');const dateDB=getActiveDateDB();
-const rCode=document.getElementById("renderRoomSelect").value;if(!rCode)return alert("請選擇房間！");const activePlaceholder=roomEmptySettings[rCode]||"💤";
+const rCode=document.getElementById("renderRoomSelect").value;if(!rCode)return;const activePlaceholder=roomEmptySettings[rCode]||"💤";
 let activeHours=Object.keys(dateDB).filter(h=>dateDB[h][rCode]&&Object.keys(dateDB[h][rCode]).some(u=>dateDB[h][rCode][u]&&dateDB[h][rCode][u].video)).sort();
 if(activeHours.length===0){outputArea.innerHTML="<p style='color:#2f3542;font-weight:bold;'>❌ 今天沒有影片紀錄</p>";return;}
 outputArea.innerHTML=`<p style='color:#747d8c;font-weight:bold;'>🚀 高速生成中...</p>`;
@@ -514,7 +522,8 @@ const regionDisplay=uData.region||"";const bx=coord.x+12;const by=coord.y+12;
 ctx.fillStyle="rgba(0,0,0,0.3)";ctx.beginPath();ctx.roundRect(bx,by,135,26,13);ctx.fill();
 if(loadedAvatars[i]){ctx.save();ctx.beginPath();ctx.arc(bx+13,by+13,9,0,Math.PI*2);ctx.clip();ctx.drawImage(loadedAvatars[i],bx+4,by+4,18,18);ctx.restore();}
 ctx.fillStyle="#ffffff";ctx.textAlign="left";ctx.font="bold 11px sans-serif";
-ctx.fillText(`${u} (${i+1}) ${regionDisplay}`,bx+28,by+17);
+// ⭐ 修正處：移除包含括號數字的字串，僅保留名字與國家地區
+ctx.fillText(`${u} ${regionDisplay}`,bx+28,by+17);
 }else{
 ctx.fillStyle='#121212';ctx.fillRect(coord.x,coord.y,cellW,cellH);ctx.fillStyle='rgba(255,255,255,0.2)';ctx.textAlign="center";
 ctx.font="800 30px 'Lexend',sans-serif";ctx.fillText(h,coord.x+cellW/2,coord.y+(cellH/2)-15);ctx.font="30px sans-serif";ctx.fillText(activePlaceholder,coord.x+cellW/2,coord.y+(cellH/2)+25);
