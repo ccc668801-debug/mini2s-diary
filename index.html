@@ -149,7 +149,7 @@ document.write(`<option value="${h}" ${i===10?'selected':''}>${h}</option>`);
 <label style="margin-top:0;color:#2f3542;">🎨 更改此房「未上傳狀態」文字：</label>
 <div style="font-size:11px;color:#747d8c;margin-bottom:6px;">目前顯示預設：<strong id="currentEmptyPlaceholderStatus" style="color:#ff7675;font-size:13px;">💤</strong></div>
 <div style="display:flex;gap:8px;">
-<input type="text" id="customEmptyStatusInput" placeholder="例如: Zzz, 👀" style="margin-bottom:0;padding:8px;">
+<input type="text" id="customEmptyStatusInput" placeholder="example: Zzz, 👀" style="margin-bottom:0;padding:8px;">
 <button onclick="broadcastCustomEmptyStatus()" style="width:auto;padding:0 15px;background:#747d8c;">更換</button>
 </div>
 </div>
@@ -197,8 +197,7 @@ const d=data.date;const h=data.hour;const u=data.userName;const r=data.roomCode;
 if(!megaDB[d])megaDB[d]=initDateHours();if(!megaDB[d][h])megaDB[d][h]={};if(!megaDB[d][h][r])megaDB[d][h][r]={};
 megaDB[d][h][r][u]={text:data.text,avatar:data.avatar,video:data.video,timeStart:0,yAlign:50,region:data.region||"🇹🇼 台灣"};
 localStorage.setItem("mini2s_megaDB",JSON.stringify(megaDB));
-const activeTabId=document.querySelector('.nav-item.active').id;
-if(activeTabId==="nav2")updateLivePublishGrid();if(activeTabId==="nav3")refreshWatchGridUI();if(activeTabId==="nav5")renderManagementPageUI();
+updateLivePublishGrid();refreshWatchGridUI();renderManagementPageUI();
 });
 if(localStorage.getItem("mini2s_userName"))document.getElementById("userName").value=localStorage.getItem("mini2s_userName");
 if(localStorage.getItem("mini2s_userRegion"))document.getElementById("userRegion").value=localStorage.getItem("mini2s_userRegion");
@@ -214,8 +213,10 @@ reader.readAsDataURL(file);
 }
 function getActiveDateDB(){const date=document.getElementById('diaryDate').value;if(!megaDB[date])megaDB[date]=initDateHours();return megaDB[date];}
 function GetRoomUserList(hour,roomCode){
-const dateDB=getActiveDateDB();const myName=document.getElementById("userName").value||"未命名";const userSet=new Set([myName]);
-if(dateDB[hour]&&dateDB[hour][roomCode]){Object.keys(dateDB[hour][roomCode]).forEach(u=>userSet.add(u));}
+const dateDB=getActiveDateDB();const myName=document.getElementById("userName").value||"未命名";const userSet=new Set();
+userSet.add(myName);
+if(dateDB[hour]&&dateDB[hour][roomCode]){Object.keys(dateDB[hour][roomCode]).forEach(u=>{if(u)userSet.add(u);});}
+globalCachedMembers.forEach(m=>{if(m.userName)userSet.add(m.userName);});
 return Array.from(userSet).slice(0,4);
 }
 function addNewRoomCodeAction(){
@@ -234,7 +235,7 @@ updateLivePublishGrid();syncInputText();if(socket&&socket.connected){socket.emit
 }
 function renderRoomMembersUI(members){
 const bar=document.getElementById("roomMembersList");if(!bar)return;bar.innerHTML="";const myName=document.getElementById("userName").value||"未命名";
-let uniqueList=[{userName:myName,avatar:userAvatarBase64}];members.forEach(m=>{if(m.userName!==myName)uniqueList.push(m);});
+let uniqueList=[{userName:myName,avatar:userAvatarBase64}];members.forEach(m=>{if(m.userName&&m.userName!==myName)uniqueList.push(m);});
 uniqueList.slice(0,4).forEach(m=>{
 const defaultSvg="data:image/svg+xml;utf8,<svg viewBox='0 0 24 24' fill='%23a4b0be'><path d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z'/></svg>";
 bar.innerHTML+=`<div class="member-chip"><img class="member-chip-avatar" src="${m.avatar||defaultSvg}"><span class="member-chip-name">${m.userName}</span></div>`;
@@ -248,7 +249,7 @@ if(socket&&socket.connected){socket.emit('get-room-members',{roomCode:roomCode})
 }
 function renderSelectedRoomMembersOnly(members){
 const container=document.getElementById("manageMembersContainer");if(!container)return;container.innerHTML="";const myName=document.getElementById("userName").value||"未命名";
-let currentList=[{userName:myName,avatar:userAvatarBase64}];members.forEach(m=>{if(m.userName!==myName)currentList.push(m);});
+let currentList=[{userName:myName,avatar:userAvatarBase64}];members.forEach(m=>{if(m.userName&&m.userName!==myName)currentList.push(m);});
 currentList.forEach(m=>{
 container.innerHTML+=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;background:#f1f2f6;padding:8px;border-radius:8px;"><img src="${m.avatar||'data:image/svg+xml;utf8,<svg viewBox=\'0 0 24 24\' fill=\'%23a4b0be\'><path d=\'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z\'/></svg>'}" style="width:24px;height:24px;border-radius:50%;object-fit:cover;"><span style="font-size:13px;font-weight:bold;">${m.userName} ${m.userName===myName?'(你)':''}</span></div>`;
 });
@@ -390,23 +391,29 @@ outputArea.innerHTML=`<p style="color:#2ed573;font-weight:bold;">🎉 生成成�
 };
 recorder.start();
 const cellW=canvas.width/2;const cellH=canvas.height/2;const gridCoords=[{x:0,y:0},{x:cellW,y:0},{x:0,y:cellH},{x:cellW,y:cellH}];
-const vEl=document.createElement('video');vEl.muted=true;vEl.playsInline=true;
+const vPlayerPool=[document.createElement('video'),document.createElement('video'),document.createElement('video'),document.createElement('video')];
+vPlayerPool.forEach(v=>{v.muted=true;v.playsInline=true;v.preload="auto";});
+const defaultSvg="data:image/svg+xml;utf8,<svg viewBox='0 0 24 24' fill='%23a4b0be'><path d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z'/></svg>";
 for(let h of activeHours){
 const userList=GetRoomUserList(h,rCode);const loadedAvatars=[];
 for(let i=0;i<4;i++){
-let u=userList[i];let src="data:image/svg+xml;utf8,<svg viewBox='0 0 24 24' fill='%23a4b0be'><path d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z'/></svg>";
+let u=userList[i];let src=defaultSvg;
 if(u&&dateDB[h]&&dateDB[h][rCode]&&dateDB[h][rCode][u]&&dateDB[h][rCode][u].avatar){src=dateDB[h][rCode][u].avatar;}
-const img=new Image();img.src=src;await new Promise(r=>img.onload=r);loadedAvatars[i]=img;
+const img=new Image();img.src=src;img.onload=function(){loadedAvatars[i]=img;};
+if(u&&dateDB[h]&&dateDB[h][rCode]&&dateDB[h][rCode][u]&&dateDB[h][rCode][u].video){
+vPlayerPool[i].src=dateDB[h][rCode][u].video;vPlayerPool[i].load();vPlayerPool[i].currentTime=0;
+vPlayerPool[i].play().catch(e=>{});
+}else{vPlayerPool[i].src="";}
 }
+await new Promise(r=>setTimeout(r,200));
 let startRun=Date.now();
 while(Date.now()-startRun<2000){
 ctx.fillStyle='#1e1e1e';ctx.fillRect(0,0,canvas.width,canvas.height);
 for(let i=0;i<4;i++){
 const u=userList[i];const coord=gridCoords[i];const uData=(u&&dateDB[h]&&dateDB[h][rCode])?dateDB[h][rCode][u]:null;
 ctx.save();ctx.beginPath();ctx.rect(coord.x,coord.y,cellW,cellH);ctx.clip();
-if(uData&&uData.video){
-if(vEl.src!==uData.video){vEl.src=uData.video;vEl.load();vEl.currentTime=0;vEl.play();await new Promise(r=>setTimeout(r,30));}
-let scale=Math.max(cellW/(vEl.videoWidth||640),cellH/(vEl.videoHeight||480));
+if(uData&&uData.video&&vPlayerPool[i].src){
+let vEl=vPlayerPool[i];let scale=Math.max(cellW/(vEl.videoWidth||640),cellH/(vEl.videoHeight||480));
 let drawW=(vEl.videoWidth||640)*scale;let drawH=(vEl.videoHeight||480)*scale;
 let drawX=coord.x+(cellW-drawW)/2;let drawY=coord.y+(cellH-drawH)/2;
 ctx.drawImage(vEl,drawX,drawY,drawW,drawH);ctx.fillStyle="rgba(0,0,0,0.12)";ctx.fillRect(coord.x,coord.y,cellW,cellH);
@@ -425,7 +432,7 @@ ctx.restore();
 await new Promise(r=>setTimeout(r,40));
 }
 }
-vEl.pause();vEl.src="";vEl.load();recorder.stop();
+vPlayerPool.forEach(v=>{v.pause();v.src="";v.load();});recorder.stop();
 }
 </script>
 </body>
