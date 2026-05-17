@@ -174,39 +174,31 @@ let socket;let userAvatarBase64="";let currentRawVideoSrc="";let megaDB={};
 let myRoomList=["123"];let roomEmptySettings={};let currentSelectedRoomCode="";let globalCachedMembers=[];
 const fullDayHours=[];for(let i=0;i<24;i++){fullDayHours.push((i<10?'0'+i:i)+':00');}
 window.onload=function(){
-const today=new Date();
-const twOffset=8*60*60*1000;
-const localTime=new Date(today.getTime()+twOffset);
+const today=new Date();const twOffset=8*60*60*1000;const localTime=new Date(today.getTime()+twOffset);
 document.getElementById('diaryDate').value=localTime.toISOString().split('T')[0];
-if(localStorage.getItem("mini2s_myRoomList")){myRoomList=JSON.parse(localStorage.getItem("mini2s_myRoomList"));}
-if(localStorage.getItem("mini2s_roomEmptySettings")){roomEmptySettings=JSON.parse(localStorage.getItem("mini2s_roomEmptySettings"));}
+if(localStorage.getItem("mini2s_myRoomList"))myRoomList=JSON.parse(localStorage.getItem("mini2s_myRoomList"));
+if(localStorage.getItem("mini2s_roomEmptySettings"))roomEmptySettings=JSON.parse(localStorage.getItem("mini2s_roomEmptySettings"));
 socket=io();
 socket.on('connect',()=>{saveProfileAndJoin();});
 socket.on('room-members-update',(data)=>{
-globalCachedMembers=data.members||[];
-const activeRoom=document.getElementById("activeRoomSelect").value;
-if(data.roomCode===activeRoom){renderRoomMembersUI(globalCachedMembers);}
-if(currentSelectedRoomCode===data.roomCode){renderSelectedRoomMembersOnly(globalCachedMembers);}
+globalCachedMembers=data.members||[];const activeRoom=document.getElementById("activeRoomSelect").value;
+if(data.roomCode===activeRoom)renderRoomMembersUI(globalCachedMembers);
+if(currentSelectedRoomCode===data.roomCode)renderSelectedRoomMembersOnly(globalCachedMembers);
 });
 socket.on('update-room-empty-status',(data)=>{
 if(data&&data.roomCode){
-roomEmptySettings[data.roomCode]=data.statusText;
-localStorage.setItem("mini2s_roomEmptySettings",JSON.stringify(roomEmptySettings));
-if(data.roomCode===currentSelectedRoomCode){document.getElementById("currentEmptyPlaceholderStatus").innerText=data.statusText;}
+roomEmptySettings[data.roomCode]=data.statusText;localStorage.setItem("mini2s_roomEmptySettings",JSON.stringify(roomEmptySettings));
+if(data.roomCode===currentSelectedRoomCode)document.getElementById("currentEmptyPlaceholderStatus").innerText=data.statusText;
 updateLivePublishGrid();refreshWatchGridUI();
 }
 });
 socket.on('new-diary-broadcast',(data)=>{
 const d=data.date;const h=data.hour;const u=data.userName;const r=data.roomCode;
-if(!megaDB[d])megaDB[d]=initDateHours();
-if(!megaDB[d][h])megaDB[d][h]={};
-if(!megaDB[d][h][r])megaDB[d][h][r]={};
+if(!megaDB[d])megaDB[d]=initDateHours();if(!megaDB[d][h])megaDB[d][h]={};if(!megaDB[d][h][r])megaDB[d][h][r]={};
 megaDB[d][h][r][u]={text:data.text,avatar:data.avatar,video:data.video,timeStart:0,yAlign:50,region:data.region||"🇹🇼 台灣"};
 localStorage.setItem("mini2s_megaDB",JSON.stringify(megaDB));
 const activeTabId=document.querySelector('.nav-item.active').id;
-if(activeTabId==="nav2")updateLivePublishGrid();
-if(activeTabId==="nav3")refreshWatchGridUI();
-if(activeTabId==="nav5")renderManagementPageUI();
+if(activeTabId==="nav2")updateLivePublishGrid();if(activeTabId==="nav3")refreshWatchGridUI();if(activeTabId==="nav5")renderManagementPageUI();
 });
 if(localStorage.getItem("mini2s_userName"))document.getElementById("userName").value=localStorage.getItem("mini2s_userName");
 if(localStorage.getItem("mini2s_userRegion"))document.getElementById("userRegion").value=localStorage.getItem("mini2s_userRegion");
@@ -216,8 +208,7 @@ updateRoomSelectOptions();saveProfileAndJoin();updateLivePublishGrid();syncInput
 };
 function initDateHours(){let obj={};fullDayHours.forEach(h=>obj[h]={});return obj;}
 function handleAvatarFile(input){
-const file=input.files[0];if(!file)return;
-const reader=new FileReader();
+const file=input.files[0];if(!file)return;const reader=new FileReader();
 reader.onload=function(e){userAvatarBase64=e.target.result;document.getElementById("avatarImage").src=userAvatarBase64;localStorage.setItem("mini2s_customAvatar",userAvatarBase64);saveProfileAndJoin();updateLivePublishGrid();};
 reader.readAsDataURL(file);
 }
@@ -388,47 +379,42 @@ if(tabIndex===1)handleActiveRoomToggle();if(tabIndex===2)refreshWatchGridUI();if
 }
 async function renderMegaFullDayVideo(){
 const canvas=document.getElementById('canvasStage');const ctx=canvas.getContext('2d');const outputArea=document.getElementById('megaOutputArea');const dateDB=getActiveDateDB();
-const myCurrentName=document.getElementById("userName").value||"未命名";const rCode=document.getElementById("renderRoomSelect").value;
-if(!rCode)return alert("請選擇房間！");const activePlaceholder=roomEmptySettings[rCode]||"💤";
+const rCode=document.getElementById("renderRoomSelect").value;if(!rCode)return alert("請選擇房間！");const activePlaceholder=roomEmptySettings[rCode]||"💤";
 let activeHours=Object.keys(dateDB).filter(h=>dateDB[h][rCode]&&Object.keys(dateDB[h][rCode]).some(u=>dateDB[h][rCode][u]&&dateDB[h][rCode][u].video)).sort();
 if(activeHours.length===0){outputArea.innerHTML="<p style='color:#2f3542;font-weight:bold;'>❌ 今天沒有影片紀錄</p>";return;}
-outputArea.innerHTML=`<p style='color:#747d8c;font-weight:bold;'>生成中...</p>`;
+outputArea.innerHTML=`<p style='color:#747d8c;font-weight:bold;'>🚀 高速生成中...</p>`;
 const stream=canvas.captureStream(24);const recorder=new MediaRecorder(stream,{mimeType:'video/webm'});let chunks=[];recorder.ondataavailable=(e)=>chunks.push(e.data);
 recorder.onstop=()=>{
 const blob=new Blob(chunks,{type:'video/mp4'});const url=URL.createObjectURL(blob);
 outputArea.innerHTML=`<p style="color:#2ed573;font-weight:bold;">🎉 生成成功！</p><video src="${url}" controls autoplay style="width:100%;max-width:320px;border-radius:12px;margin-top:10px;"></video><a href="${url}" download="Diary_Room_${rCode}.mp4" style="color:#2f3542;text-decoration:none;font-weight:bold;display:block;margin-top:8px;">📥 下載 MP4</a>`;
 };
 recorder.start();
-const userSet=new Set([myCurrentName]);activeHours.forEach(h=>{if(dateDB[h][rCode])Object.keys(dateDB[h][rCode]).forEach(u=>userSet.add(u));});const userList=Array.from(userSet).slice(0,4);
-const loadedAvatars={};
-for(let u of userList){
-let src="data:image/svg+xml;utf8,<svg viewBox='0 0 24 24' fill='%23a4b0be'><path d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z'/></svg>";
-for(let h of activeHours){if(dateDB[h]&&dateDB[h][rCode]&&dateDB[h][rCode][u]&&dateDB[h][rCode][u].avatar){src=dateDB[h][rCode][u].avatar;break;}}
-const img=new Image();img.src=src;await new Promise(r=>img.onload=r);loadedAvatars[u]=img;
-}
 const cellW=canvas.width/2;const cellH=canvas.height/2;const gridCoords=[{x:0,y:0},{x:cellW,y:0},{x:0,y:cellH},{x:cellW,y:cellH}];
+const vEl=document.createElement('video');vEl.muted=true;vEl.playsInline=true;
 for(let h of activeHours){
-const vElements={};
-for(let u of userList){
-if(dateDB[h]&&dateDB[h][rCode]&&dateDB[h][rCode][u]&&dateDB[h][rCode][u].video){
-const v=document.createElement('video');v.src=dateDB[h][rCode][u].video;v.muted=true;v.playsInline=true;v.currentTime=0;v.play();vElements[u]=v;
-}
+const userList=GetRoomUserList(h,rCode);const loadedAvatars=[];
+for(let i=0;i<4;i++){
+let u=userList[i];let src="data:image/svg+xml;utf8,<svg viewBox='0 0 24 24' fill='%23a4b0be'><path d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z'/></svg>";
+if(u&&dateDB[h]&&dateDB[h][rCode]&&dateDB[h][rCode][u]&&dateDB[h][rCode][u].avatar){src=dateDB[h][rCode][u].avatar;}
+const img=new Image();img.src=src;await new Promise(r=>img.onload=r);loadedAvatars[i]=img;
 }
 let startRun=Date.now();
 while(Date.now()-startRun<2000){
 ctx.fillStyle='#1e1e1e';ctx.fillRect(0,0,canvas.width,canvas.height);
 for(let i=0;i<4;i++){
-const u=userList[i];if(!u)continue;const coord=gridCoords[i];const uData=(dateDB[h]&&dateDB[h][rCode])?dateDB[h][rCode][u]:null;
+const u=userList[i];const coord=gridCoords[i];const uData=(u&&dateDB[h]&&dateDB[h][rCode])?dateDB[h][rCode][u]:null;
 ctx.save();ctx.beginPath();ctx.rect(coord.x,coord.y,cellW,cellH);ctx.clip();
-if(uData&&uData.video&&vElements[u]&&vElements[u].videoWidth > 0){
-const video=vElements[u];let scale=Math.max(cellW/video.videoWidth,cellH/video.videoHeight);
-let drawW=video.videoWidth*scale;let drawH=video.videoHeight*scale;let drawX=coord.x+(cellW-drawW)/2;let drawY=coord.y+(cellH-drawH)/2;
-ctx.drawImage(video,drawX,drawY,drawW,drawH);ctx.fillStyle="rgba(0,0,0,0.12)";ctx.fillRect(coord.x,coord.y,cellW,cellH);
+if(uData&&uData.video){
+if(vEl.src!==uData.video){vEl.src=uData.video;vEl.load();vEl.currentTime=0;vEl.play();await new Promise(r=>setTimeout(r,30));}
+let scale=Math.max(cellW/(vEl.videoWidth||640),cellH/(vEl.videoHeight||480));
+let drawW=(vEl.videoWidth||640)*scale;let drawH=(vEl.videoHeight||480)*scale;
+let drawX=coord.x+(cellW-drawW)/2;let drawY=coord.y+(cellH-drawH)/2;
+ctx.drawImage(vEl,drawX,drawY,drawW,drawH);ctx.fillStyle="rgba(0,0,0,0.12)";ctx.fillRect(coord.x,coord.y,cellW,cellH);
 ctx.fillStyle="#ffffff";ctx.textAlign="center";ctx.shadowColor="rgba(0,0,0,0.6)";ctx.shadowBlur=8;ctx.font="800 32px 'Lexend',sans-serif";ctx.fillText(h,coord.x+cellW/2,coord.y+(cellH/2)-10);
 ctx.font="bold 20px sans-serif";ctx.fillText(uData.text,coord.x+cellW/2,coord.y+(cellH/2)+30);ctx.shadowBlur=0;
 const regionDisplay=uData.region||"";const bx=coord.x+12;const by=coord.y+12;
 ctx.fillStyle="rgba(0,0,0,0.3)";ctx.beginPath();ctx.roundRect(bx,by,125,26,13);ctx.fill();
-if(loadedAvatars[u]){ctx.save();ctx.beginPath();ctx.arc(bx+13,by+13,9,0,Math.PI*2);ctx.clip();ctx.drawImage(loadedAvatars[u],bx+4,by+4,18,18);ctx.restore();}
+if(loadedAvatars[i]){ctx.save();ctx.beginPath();ctx.arc(bx+13,by+13,9,0,Math.PI*2);ctx.clip();ctx.drawImage(loadedAvatars[i],bx+4,by+4,18,18);ctx.restore();}
 ctx.fillStyle="#ffffff";ctx.textAlign="left";ctx.font="bold 11px sans-serif";ctx.fillText(`${u} ${regionDisplay.substring(0,6)}`,bx+28,by+17);
 }else{
 ctx.fillStyle='#121212';ctx.fillRect(coord.x,coord.y,cellW,cellH);ctx.fillStyle='rgba(255,255,255,0.2)';ctx.textAlign="center";
@@ -438,9 +424,8 @@ ctx.restore();
 }
 await new Promise(r=>setTimeout(r,40));
 }
-for(let u in vElements){vElements[u].pause();vElements[u].src="";vElements[u].load();}
 }
-recorder.stop();
+vEl.pause();vEl.src="";vEl.load();recorder.stop();
 }
 </script>
 </body>
