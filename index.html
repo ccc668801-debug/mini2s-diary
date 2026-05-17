@@ -222,7 +222,17 @@ updateLivePublishGrid();refreshWatchGridUI();
 socket.on('new-diary-broadcast',(data)=>{
 const d=data.date;const h=data.hour;const u=data.userName;const r=data.roomCode;
 if(!megaDB[d])megaDB[d]=initDateHours();if(!megaDB[d][h])megaDB[d][h]={};if(!megaDB[d][h][r])megaDB[d][h][r]={};
-megaDB[d][h][r][u]={text:data.text,avatar:data.avatar,video:data.video,timeStart:0,yAlign:50,region:data.region||"🇹🇼 台灣"};
+
+// 保存完整的廣播資料，包含對方的座位號碼！
+megaDB[d][h][r][u]={
+  text:data.text,
+  avatar:data.avatar,
+  video:data.video,
+  timeStart:0,
+  yAlign:50,
+  region:data.region||"🇹🇼 台灣",
+  seatNo:data.seatNo
+};
 localStorage.setItem("mini2s_megaDB",JSON.stringify(megaDB));
 updateLivePublishGrid();
 refreshWatchGridUI();
@@ -246,15 +256,35 @@ reader.readAsDataURL(file);
 }
 function getActiveDateDB(){const date=document.getElementById('diaryDate').value;if(!megaDB[date])megaDB[date]=initDateHours();return megaDB[date];}
 
-// 關鍵核心：完全依照後端座位(seatNo)排座，回傳固定 4 個位置的成員名字
-function GetSeatUserArray(){
-let seats = [null, null, null, null]; // 分別代表 1, 2, 3, 4 號位
+// ⭐ 終極修正：結合「在線座位」與「已發布歷史座位」，確保斷線或換時段影片也絕不隱形！
+function GetSeatUserArrayByHour(hour, roomCode){
+let seats = [null, null, null, null];
+const dateDB = getActiveDateDB();
+
+// 1. 先用當前在線的名單填入座位
 globalCachedMembers.forEach(m => {
   if(m.seatNo >= 1 && m.seatNo <= 4) {
 	seats[m.seatNo - 1] = m.userName;
   }
 });
+
+// 2. 如果該時段有發布過歷史影片的人，就算中途斷線了，也強制把他拉回他當時發布的座位上
+if(dateDB[hour] && dateDB[hour][roomCode]){
+  Object.keys(dateDB[hour][roomCode]).forEach(u => {
+	const uData = dateDB[hour][roomCode][u];
+	if(uData && uData.seatNo >= 1 && uData.seatNo <= 4){
+	  seats[uData.seatNo - 1] = u;
+	}
+  });
+}
 return seats;
+}
+
+// 獲取當前自己的座位號碼
+function getMySeatNo(){
+const myName = document.getElementById("userName").value || "未命名";
+const found = globalCachedMembers.find(m => m.userName === myName);
+return found ? found.seatNo : 1;
 }
 
 function addNewRoomCodeAction(){
@@ -277,7 +307,6 @@ updateLivePublishGrid();syncInputText();if(socket&&socket.connected){socket.emit
 
 function renderRoomMembersUI(members){
 const bar=document.getElementById("roomMembersList");if(!bar)return;bar.innerHTML="";
-// 按照座位順序排列顯示
 let sorted = [...members].sort((a,b)=>a.seatNo - b.seatNo);
 sorted.forEach(m=>{
 const defaultSvg="data:image/svg+xml;utf8,<svg viewBox='0 0 24 24' fill='%23a4b0be'><path d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z'/></svg>";
@@ -337,24 +366,26 @@ if(!confirm(`確定要刪除房間 [${roomCode}] 在 ${hour} 的紀錄嗎？`))r
 const date=document.getElementById('diaryDate').value;const myName=document.getElementById("userName").value||"未命名";const dateDB=getActiveDateDB();
 if(dateDB[hour]&&dateDB[hour][roomCode]&&dateDB[hour][roomCode][myName]){
 delete dateDB[hour][roomCode][myName];localStorage.setItem("mini2s_megaDB",JSON.stringify(megaDB));
-if(socket&&socket.connected){socket.emit('share-diary',{roomCode:roomCode,userName:myName,date:date,hour:hour,text:"",avatar:"",video:"",timeStart:0,yAlign:50,region:""});}
+if(socket&&socket.connected){socket.emit('share-diary',{roomCode:roomCode,userName:myName,date:date,hour:hour,text:"",avatar:"",video:"",timeStart:0,yAlign:50,region:"",seatNo:1});}
 alert("已成功刪除！");renderManagementPageUI();updateLivePublishGrid();
 }
 }
 
-// 嚴格入座渲染：1左上、2右上、3左下、4右下
 function updateLivePublishGrid(){
 const gridContainer=document.getElementById("publishQuadGrid");if(!gridContainer)return;gridContainer.innerHTML="";
 const activeRoom=document.getElementById("activeRoomSelect").value;if(!activeRoom)return;
 const hour=document.getElementById("currentHour").value;const text=document.getElementById("statusText").value||"";const myName=document.getElementById("userName").value||"未命名";
 const reg=document.getElementById("userRegion").value||"🇹🇼 台灣";const dateDB=getActiveDateDB();
-const seatUsers=GetSeatUserArray();const activeRoomEmptyPlaceholder=roomEmptySettings[activeRoom]||"💤";
+const seatUsers=GetSeatUserArrayByHour(hour, activeRoom);const activeRoomEmptyPlaceholder=roomEmptySettings[activeRoom]||"💤";
 
 for(let i=0; i<4; i++){
 const user=seatUsers[i];const cell=document.createElement("div");cell.className="grid-cell";
 if(user===myName){
 if(currentRawVideoSrc){
 cell.innerHTML=`<div class="cell-overlay-time-box"><div class="cell-time-title">${hour}</div><div class="cell-desc-title">${text}</div></div><div class="cell-profile-badge"><img class="cell-badge-avatar" src="${userAvatarBase64||'data:image/svg+xml;utf8,<svg viewBox=\'0 0 24 24\' fill=\'%23a4b0be\'><path d=\'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z\'/></svg>'}"><span class="cell-badge-name">${myName} (${i+1}) ${reg}</span></div><video class="grid-cell-video" id="liveEditVideoRef" loop muted playsinline src="${currentRawVideoSrc}"></video>`;
+}else if(dateDB[hour]&&dateDB[hour][activeRoom]&&dateDB[hour][activeRoom][myName]&&dateDB[hour][activeRoom][myName].video){
+const uData=dateDB[hour][activeRoom][myName];
+cell.innerHTML=`<div class="cell-overlay-time-box"><div class="cell-time-title">${hour}</div><div class="cell-desc-title">${uData.text}</div></div><div class="cell-profile-badge"><img class="cell-badge-avatar" src="${userAvatarBase64||'data:image/svg+xml;utf8,<svg viewBox=\'0 0 24 24\' fill=\'%23a4b0be\'><path d=\'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z\'/></svg>'}"><span class="cell-badge-name">${myName} (${i+1}) ${reg}</span></div><video class="grid-cell-video" loop autoplay muted playsinline src="${uData.video}"></video>`;
 }else{
 cell.innerHTML=`<div class="cell-empty-placeholder"><div class="cell-empty-time">${hour}</div><span style="font-size:24px;margin-bottom:5px;">${activeRoomEmptyPlaceholder}</span><span style="font-size:11px;font-weight:bold;">👉 (${i+1}) 點上方添加影片</span></div>`;
 }
@@ -375,17 +406,26 @@ document.getElementById('timerStatus').innerText="⏳ 載入影片中...";const 
 reader.onload=function(e){currentRawVideoSrc=e.target.result;document.getElementById('timerStatus').innerText="✨ 影片已就緒！";updateLivePublishGrid();};
 reader.readAsDataURL(file);
 }
+
 function submitDiaryToServer(){
 const textInput=document.getElementById('statusText').value;if(!textInput||!currentRawVideoSrc)return alert("請填寫狀態並選擇影片唷！🎬");
 const date=document.getElementById('diaryDate').value;const hour=document.getElementById('currentHour').value;const uName=document.getElementById("userName").value||"未命名";
 const activeRoom=document.getElementById("activeRoomSelect").value;const reg=document.getElementById("userRegion").value;
 if(!activeRoom)return alert("你目前沒有在任何房間中！");const dateDB=getActiveDateDB();
+
+const mySeat = getMySeatNo(); // 抓取自己當下的座位號
+
 if(!dateDB[hour][activeRoom])dateDB[hour][activeRoom]={};
-dateDB[hour][activeRoom][uName]={text:textInput,avatar:userAvatarBase64,video:currentRawVideoSrc,timeStart:0,yAlign:50,region:reg};
+dateDB[hour][activeRoom][uName]={text:textInput,avatar:userAvatarBase64,video:currentRawVideoSrc,timeStart:0,yAlign:50,region:reg,seatNo:mySeat};
 localStorage.setItem("mini2s_megaDB",JSON.stringify(megaDB));
-if(socket&&socket.connected){socket.emit('share-diary',{roomCode:activeRoom,userName:uName,date:date,hour:hour,text:textInput,avatar:userAvatarBase64,video:currentRawVideoSrc,timeStart:0,yAlign:50,region:reg});}
+
+if(socket&&socket.connected){
+  // 發送時連同座位號碼(seatNo)一起廣播給所有人
+  socket.emit('share-diary',{roomCode:activeRoom,userName:uName,date:date,hour:hour,text:textInput,avatar:userAvatarBase64,video:currentRawVideoSrc,timeStart:0,yAlign:50,region:reg,seatNo:mySeat});
+}
 setTimeout(()=>{alert("新增完成！🎉");clearPublishPage();},300);
 }
+
 function clearPublishPage(){
 document.getElementById('statusText').value="";document.getElementById('timerStatus').innerText="";
 document.getElementById('cameraVideoInput').value="";document.getElementById('fileVideoInput').value="";currentRawVideoSrc="";updateLivePublishGrid();
@@ -395,7 +435,8 @@ function refreshWatchGridUI(){
 const gridContainer=document.getElementById("watchQuadGrid");if(!gridContainer)return;gridContainer.innerHTML="";
 const watchRoom=document.getElementById("watchRoomSelect").value;if(!watchRoom)return;
 const hour=document.getElementById("watchHourSelect").value;const dateDB=getActiveDateDB();
-const seatUsers=GetSeatUserArray();const activePlaceholder=roomEmptySettings[watchRoom]||"💤";
+const seatUsers=GetSeatUserArrayByHour(hour, watchRoom);const activePlaceholder=roomEmptySettings[watchRoom]||"💤";
+
 for(let i=0;i<4;i++){
 const user=seatUsers[i];const cell=document.createElement("div");cell.className="grid-cell";
 if(user&&dateDB[hour]&&dateDB[hour][watchRoom]&&dateDB[hour][watchRoom][user]&&dateDB[hour][watchRoom][user].video){
@@ -407,6 +448,7 @@ cell.innerHTML=`<div class="cell-empty-placeholder"><div class="cell-empty-time"
 gridContainer.appendChild(cell);
 }
 }
+
 function saveProfileAndJoin(){
 const uName=document.getElementById("userName").value||"未命名";const reg=document.getElementById("userRegion").value;
 localStorage.setItem("mini2s_userName",uName);localStorage.setItem("mini2s_userRegion",reg);
@@ -445,7 +487,7 @@ vPlayerPool.forEach(v=>{v.muted=true;v.playsInline=true;v.preload="auto";});
 const defaultSvg="data:image/svg+xml;utf8,<svg viewBox='0 0 24 24' fill='%23a4b0be'><path d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z'/></svg>";
 
 for(let h of activeHours){
-const seatUsers=GetSeatUserArray();const loadedAvatars=[];
+const seatUsers=GetSeatUserArrayByHour(h, rCode);const loadedAvatars=[];
 for(let i=0;i<4;i++){
 let u=seatUsers[i];let src=defaultSvg;
 if(u&&dateDB[h]&&dateDB[h][rCode]&&dateDB[h][rCode][u]&&dateDB[h][rCode][u].avatar){src=dateDB[h][rCode][u].avatar;}
@@ -472,7 +514,6 @@ const regionDisplay=uData.region||"";const bx=coord.x+12;const by=coord.y+12;
 ctx.fillStyle="rgba(0,0,0,0.3)";ctx.beginPath();ctx.roundRect(bx,by,135,26,13);ctx.fill();
 if(loadedAvatars[i]){ctx.save();ctx.beginPath();ctx.arc(bx+13,by+13,9,0,Math.PI*2);ctx.clip();ctx.drawImage(loadedAvatars[i],bx+4,by+4,18,18);ctx.restore();}
 ctx.fillStyle="#ffffff";ctx.textAlign="left";ctx.font="bold 11px sans-serif";
-// 修正處：移除 substring 限制，確保台灣完整顯示
 ctx.fillText(`${u} (${i+1}) ${regionDisplay}`,bx+28,by+17);
 }else{
 ctx.fillStyle='#121212';ctx.fillRect(coord.x,coord.y,cellW,cellH);ctx.fillStyle='rgba(255,255,255,0.2)';ctx.textAlign="center";
