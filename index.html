@@ -1,925 +1,469 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Diary</title>
-    <script src="/socket.io/socket.io.js"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght=400;700&family=Lexend:wght=600;800&display=swap');
-        
-        * {
-            font-family: 'Noto Sans TC', 'Microsoft JhengHei', sans-serif;
-            border-radius: 16px;
-            box-sizing: border-box;
-            transition: all 0.2s ease;
-        }
-
-        body {
-            background-color: #f5f6fa;
-            color: #2f3542;
-            max-width: 480px;
-            margin: 0 auto;
-            padding: 20px 20px 90px 20px;
-        }
-
-        h1, h3 { color: #2f3542; text-align: center; margin-bottom: 20px; font-weight: 700; letter-spacing: 0.5px; }
-
-        .date-selector-box {
-            background: #ffffff; border: 1px solid #e4e7eb; padding: 10px; margin-bottom: 15px; text-align: center;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.02);
-        }
-        .date-picker-input {
-            width: auto; display: inline-block; padding: 5px 10px; margin-left: 5px;
-            border: 2px solid #2f3542; background: #fff; font-weight: bold; color: #2f3542; font-size: 14px; outline: none;
-        }
-
-        /* 頂部全域房間成員顯示區 */
-        .room-members-bar {
-            background: #ffffff; border: 1px solid #e4e7eb; padding: 12px; margin-bottom: 15px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.02); display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-        }
-        .member-bar-title { font-size: 12px; font-weight: bold; color: #747d8c; }
-        .member-chip { display: flex; align-items: center; gap: 6px; background: #f1f2f6; padding: 4px 10px; border-radius: 20px; }
-        .member-chip-avatar { width: 20px; height: 20px; border-radius: 50%; object-fit: cover; }
-        .member-chip-name { font-size: 11px; font-weight: 700; color: #2f3542; }
-
-        .card {
-            background: #ffffff; padding: 20px; margin-bottom: 15px;
-            box-shadow: 0 6px 18px rgba(164, 176, 190, 0.15); border: 1px solid #f1f2f6;
-        }
-
-        label { display: block; font-size: 13px; font-weight: bold; color: #747d8c; margin-top: 10px; margin-bottom: 4px; }
-        input, select { width: 100%; padding: 12px; margin-bottom: 8px; border: 2px solid #f1f2f6; background: #fdfdfd; font-size: 14px; }
-        input:focus, select:focus { outline: none; border-color: #2f3542; background: #fff; }
-
-        button {
-            width: 100%; padding: 12px; background: #2f3542; color: white; font-weight: bold; font-size: 15px; border: none; cursor: pointer;
-            box-shadow: 0 4px 10px rgba(47, 53, 66, 0.2);
-        }
-        button:hover { background: #57606f; }
-
-        .upload-options-group { display: flex; gap: 10px; margin-bottom: 12px; }
-        .upload-opt-btn {
-            flex: 1; padding: 12px 5px; font-size: 13px; text-align: center; font-weight: bold; cursor: pointer;
-            border: 2px solid #f1f2f6; background: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
-        }
-        .upload-opt-btn:active { background: #f1f2f6; border-color: #2f3542; }
-
-        /* 黃金比例四宮格牆 */
-        .quad-grid-stage {
-            position: relative; width: 100%; height: 500px; background: #121212; overflow: hidden; border-radius: 16px; margin-bottom: 15px;
-            display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 2px;
-        }
-        .grid-cell { position: relative; width: 100%; height: 100%; background: #1a1a1a; overflow: hidden; }
-        .grid-cell-video { width: 100%; height: 100%; object-fit: cover; }
-        
-        .cell-overlay-time-box {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            width: 100%; text-align: center; color: #ffffff; text-shadow: 0 2px 8px rgba(0,0,0,0.85); z-index: 10; pointer-events: none;
-        }
-        .cell-time-title { font-family: 'Lexend', sans-serif; font-size: 20px; font-weight: 800; margin: 0; }
-        .cell-desc-title { font-size: 15px; font-weight: 700; margin-top: 4px; padding: 0 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-        .cell-profile-badge {
-            position: absolute; top: 8px; left: 8px; display: flex; align-items: center; gap: 4px;
-            background: rgba(0, 0, 0, 0.4); padding: 3px 6px; border-radius: 20px; color: white; z-index: 11; pointer-events: none;
-        }
-        .cell-badge-avatar { width: 16px; height: 16px; border-radius: 50%; object-fit: cover; }
-        .cell-badge-name { font-size: 10px; font-weight: 700; }
-
-        .cell-empty-placeholder {
-            width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; color: rgba(255,255,255,0.2); gap: 4px;
-        }
-        .cell-empty-time { font-family: 'Lexend', sans-serif; font-size: 18px; font-weight: 800; }
-
-        /* 微調控制面板 */
-        #tweakControlPanel { display: none; background: #2f3542; padding: 15px; margin-top: 10px; border-radius: 12px; }
-        .range-control-group { background: rgba(255,255,255,0.1); padding: 8px; border-radius: 8px; margin-bottom: 8px; }
-        .range-slider { width: 100%; margin: 4px 0; accent-color: #ff7675; }
-
-        /* 💥 新增：房間清單與展開面板樣式 */
-        .room-item-row {
-            background: #f1f2f6; padding: 15px; margin-bottom: 10px; border-radius: 14px; cursor: pointer;
-            font-weight: bold; display: flex; justify-content: space-between; align-items: center;
-        }
-        .room-item-row:hover { background: #e4e7eb; }
-        .room-detail-panel {
-            display: none; background: #ffffff; border: 2px solid #f1f2f6; padding: 15px; margin-bottom: 15px; border-radius: 14px;
-        }
-
-        .manage-item-row {
-            display: flex; justify-content: space-between; align-items: center; 
-            padding: 10px; background: #f1f2f6; margin-bottom: 8px; border-radius: 12px;
-        }
-        .manage-item-info { font-size: 13px; font-weight: bold; }
-        .btn-danger-small {
-            background: #ff7675; color: white; padding: 6px 12px; font-size: 11px; 
-            border-radius: 8px; width: auto; box-shadow: none;
-        }
-        .btn-danger-small:hover { background: #e84118; }
-
-        /* 主導覽列五個分頁 */
-        .navbar {
-            position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 480px; height: 65px;
-            background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); display: flex; justify-content: space-around; align-items: center;
-            border-top: 1px solid #f1f2f6; border-radius: 20px 20px 0 0; z-index: 999;
-        }
-        .nav-item { display: flex; flex-direction: column; align-items: center; justify-content: center; color: #a4b0be; cursor: pointer; font-size: 11px; font-weight: bold; width: 19%; }
-        .nav-item.active { color: #2f3542; }
-
-        .tab-content { display: none; }
-        .tab-content.active { display: block; }
-        
-        #canvasStage { display: none !important; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Diary</title>
+<script src="/socket.io/socket.io.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght=400;700&family=Lexend:wght=600;800&display=swap');
+*{font-family:'Noto Sans TC','Microsoft JhengHei',sans-serif;border-radius:16px;box-sizing:border-box;transition:all 0.2s ease;}
+body{background-color:#f5f6fa;color:#2f3542;max-width:480px;margin:0 auto;padding:20px 20px 90px 20px;}
+h1,h3{color:#2f3542;text-align:center;margin-bottom:20px;font-weight:700;letter-spacing:0.5px;}
+.date-selector-box{background:#ffffff;border:1px solid #e4e7eb;padding:10px;margin-bottom:15px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,0.02);}
+.date-picker-input{width:auto;display:inline-block;padding:5px 10px;margin-left:5px;border:2px solid #2f3542;background:#fff;font-weight:bold;color:#2f3542;font-size:14px;outline:none;}
+.room-members-bar{background:#ffffff;border:1px solid #e4e7eb;padding:12px;margin-bottom:15px;box-shadow:0 2px 8px rgba(0,0,0,0.02);display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.member-bar-title{font-size:12px;font-weight:bold;color:#747d8c;}
+.member-chip{display:flex;align-items:center;gap:6px;background:#f1f2f6;padding:4px 10px;border-radius:20px;}
+.member-chip-avatar{width:20px;height:20px;border-radius:50%;object-fit:cover;}
+.member-chip-name{font-size:11px;font-weight:700;color:#2f3542;}
+.card{background:#ffffff;padding:20px;margin-bottom:15px;box-shadow:0 6px 18px rgba(164,176,190,0.15);border:1px solid #f1f2f6;}
+label{display:block;font-size:13px;font-weight:bold;color:#747d8c;margin-top:10px;margin-bottom:4px;}
+input,select{width:100%;padding:12px;margin-bottom:8px;border:2px solid #f1f2f6;background:#fdfdfd;font-size:14px;}
+input:focus,select:focus{outline:none;border-color:#2f3542;background:#fff;}
+button{width:100%;padding:12px;background:#2f3542;color:white;font-weight:bold;font-size:15px;border:none;cursor:pointer;box-shadow:0 4px 10px rgba(47, 53, 66, 0.2);}
+button:hover{background:#57606f;}
+.upload-options-group{display:flex;gap:10px;margin-bottom:12px;}
+.upload-opt-btn{flex:1;padding:12px 5px;font-size:13px;text-align:center;font-weight:bold;cursor:pointer;border:2px solid #f1f2f6;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;}
+.upload-opt-btn:active{background:#f1f2f6;border-color:#2f3542;}
+.quad-grid-stage{position:relative;width:100%;height:500px;background:#121212;overflow:hidden;border-radius:16px;margin-bottom:15px;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:2px;}
+.grid-cell{position:relative;width:100%;height:100%;background:#1a1a1a;overflow:hidden;}
+.grid-cell-video{width:100%;height:100%;object-fit:cover;}
+.cell-overlay-time-box{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:100%;text-align:center;color:#ffffff;text-shadow:0 2px 8px rgba(0,0,0,0.85);z-index:10;pointer-events:none;}
+.cell-time-title{font-family:'Lexend',sans-serif;font-size:20px;font-weight:800;margin:0;}
+.cell-desc-title{font-size:15px;font-weight:700;margin-top:4px;padding:0 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cell-profile-badge{position:absolute;top:8px;left:8px;display:flex;align-items:center;gap:4px;background:rgba(0,0,0,0.4);padding:3px 6px;border-radius:20px;color:white;z-index:11;pointer-events:none;}
+.cell-badge-avatar{width:16px;height:16px;border-radius:50%;object-fit:cover;}
+.cell-badge-name{font-size:10px;font-weight:700;}
+.cell-empty-placeholder{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;color:rgba(255,255,255,0.2);gap:4px;}
+.cell-empty-time{font-family:'Lexend',sans-serif;font-size:18px;font-weight:800;}
+#tweakControlPanel{display:none;background:#2f3542;padding:15px;margin-top:10px;border-radius:12px;}
+.range-control-group{background:rgba(255,255,255,0.1);padding:8px;border-radius:8px;margin-bottom:8px;}
+.range-slider{width:100%;margin:4px 0;accent-color:#ff7675;}
+.room-item-row{background:#f1f2f6;padding:15px;margin-bottom:10px;border-radius:14px;cursor:pointer;font-weight:bold;display:flex;justify-content:space-between;align-items:center;}
+.room-item-row:hover{background:#e4e7eb;}
+.room-detail-panel{display:none;background:#ffffff;border:2px solid #f1f2f6;padding:15px;margin-bottom:15px;border-radius:14px;}
+.manage-item-row{display:flex;justify-content:space-between;align-items:center;padding:10px;background:#f1f2f6;margin-bottom:8px;border-radius:12px;}
+.manage-item-info{font-size:13px;font-weight:bold;}
+.btn-danger-small{background:#ff7675;color:white;padding:6px 12px;font-size:11px;border-radius:8px;width:auto;box-shadow:none;}
+.btn-danger-small:hover{background:#e84118;}
+.navbar{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;height:65px;background:rgba(255,255,255,0.95);backdrop-filter:blur(10px);display:flex;justify-content:space-around;align-items:center;border-top:1px solid #f1f2f6;border-radius:20px 20px 0 0;z-index:999;}
+.nav-item{display:flex;flex-direction:column;align-items:center;justify-content:center;color:#a4b0be;cursor:pointer;font-size:11px;font-weight:bold;width:19%;}
+.nav-item.active{color:#2f3542;}
+.tab-content{display:none;}
+.tab-content.active{display:block;}
+#canvasStage{display:none !important;}
+</style>
 </head>
 <body>
-
-    <h1>Diary</h1>
-    <div id="connStatus" style="text-align:center; font-size:12px; color:#2ed573; font-weight:bold; margin-bottom:10px;">🟢 已連線</div>
-
-    <div class="room-members-bar">
-        <div class="member-bar-title">🏡 目前房間成員：</div>
-        <div id="roomMembersList" style="display: flex; gap: 8px; align-items: center;"></div>
-    </div>
-
-    <div class="date-selector-box">
-        <label>📅 日記日期：</label>
-        <input type="date" id="diaryDate" class="date-picker-input" onchange="handleDateChange()">
-    </div>
-
-    <div id="page1" class="tab-content active">
-        <div class="card">
-            <h3>🔑 個人與自定義地區</h3>
-            <label>名字：</label>
-            <input type="text" id="userName" value="" placeholder="請輸入名字" onchange="saveProfileAndJoin(); updateLivePublishGrid();">
-
-            <label>大頭貼：</label>
-            <div class="avatar-uploader" style="display:flex; flex-direction:column; align-items:center; margin:10px 0;">
-                <div style="width:70px; height:70px; border-radius:50%; border:2px dashed #2f3542; background:#f1f2f6; display:flex; align-items:center; justify-content:center; overflow:hidden; cursor:pointer;" onclick="document.getElementById('avatarFileInput').click()">
-                    <img id="avatarImage" style="width:100%; height:100%; object-fit:cover;" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23a4b0be'><path d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z'/></svg>">
-                </div>
-                <input type="file" id="avatarFileInput" accept="image/*" style="display: none;" onchange="handleAvatarFile(this)">
-            </div>
-
-            <label>📍 目前所在地區：</label>
-            <input type="text" id="userRegion" value="🇹🇼 台灣" placeholder="可自由修改地區或 Emoji" onchange="saveProfileAndJoin(); updateLivePublishGrid();">
-
-            <label>輸入想進入/新增的房間代碼：</label>
-            <input type="text" id="roomCode" value="123" placeholder="例如: 123">
-            <button onclick="addNewRoomCodeAction()">進入該房間 ➔</button>
-        </div>
-    </div>
-
-    <div id="page2" class="tab-content">
-        <div class="card">
-            <h3>🕒 當地時段發布 (目前房號: <span id="currentPublishRoomTitle" style="color:#ff7675;">-</span>)</h3>
-            <label>當前操作房號切換：</label>
-            <select id="activeRoomSelect" onchange="handleActiveRoomToggle()"></select>
-
-            <label>當地時間：</label>
-            <select id="currentHour" onchange="syncInputText(); updateLivePublishGrid();">
-                <script>
-                    for(let i=0; i<24; i++) {
-                        let h = (i<10?'0':'')+i+':00';
-                        document.write(`<option value="${h}" ${i===10?'selected':''}>${h}</option>`);
-                    }
-                </script>
-            </select>
-            
-            <label>當下在幹嘛（狀態文字）：</label>
-            <input type="text" id="statusText" placeholder="" oninput="updateLivePublishGrid()">
-            
-            <label>添加影片：</label>
-            <div class="upload-options-group">
-                <div class="upload-opt-btn" onclick="document.getElementById('cameraVideoInput').click()">📸 相機拍攝</div>
-                <div class="upload-opt-btn" onclick="document.getElementById('fileVideoInput').click()">📁 手機相簿</div>
-            </div>
-            <input type="file" id="cameraVideoInput" accept="video/*" capture="camera" style="display: none;" onchange="prepareVideoEditor(this)">
-            <input type="file" id="fileVideoInput" accept="video/*" style="display: none;" onchange="prepareVideoEditor(this)">
-
-            <label>🎬 發布對齊預覽牆：</label>
-            <div class="quad-grid-stage" id="publishQuadGrid"></div>
-            
-            <div id="tweakControlPanel">
-                <div class="range-control-group">
-                    <label style="color:#fff; font-size:11px;"><span id="timeVal">0.0s</span></label>
-                    <input type="range" id="timeOffsetSlider" class="range-slider" min="0" max="10" step="0.1" value="0" oninput="updateVideoCropPreview()">
-                </div>
-                <div class="range-control-group">
-                    <label style="color:#fff; font-size:11px;">↕️ 畫面上下移動置中: <span id="yVal">50%</span></label>
-                    <input type="range" id="vOffsetSlider" class="range-slider" min="0" max="100" value="50" oninput="updateVideoCropPreview()">
-                </div>
-            </div>
-
-            <button id="uploadBtn" onclick="submitDiaryToServer()" style="margin-top: 15px;">🚀 發布日常動態</button>
-            <p id="timerStatus" style="color: #2ed573; font-weight: bold; text-align: center; margin-top: 8px; font-size: 13px;"></p>
-        </div>
-    </div>
-
-    <div id="page3" class="tab-content">
-        <div class="card">
-            <h3>看看大家在幹嘛</h3>
-            <label>選擇觀看房間：</label>
-            <select id="watchRoomSelect" onchange="refreshWatchGridUI()"></select>
-
-            <label>選擇觀看時段：</label>
-            <select id="watchHourSelect" onchange="refreshWatchGridUI()">
-                <script>
-                    for(let i=0; i<24; i++) {
-                        let h = (i<10?'0':'')+i+':00';
-                        document.write(`<option value="${h}" ${i===10?'selected':''}>${h}</option>`);
-                    }
-                </script>
-            </select>
-
-            <div class="quad-grid-stage" id="watchQuadGrid"></div>
-        </div>
-    </div>
-
-    <div id="page4" class="tab-content">
-        <div class="card">
-            <h3>全天 24 小時</h3>
-            <label>選擇要生成大片的房間：</label>
-            <select id="renderRoomSelect" style="margin-bottom:15px;"></select>
-            <button onclick="renderMegaFullDayVideo()" style="background: #2ed573; color: white; padding: 15px; font-size: 16px;">一鍵生成 24H</button>
-            <div id="megaOutputArea" style="margin-top: 20px; text-align: center;"></div>
-        </div>
-        <canvas id="canvasStage" width="540" height="960"></canvas>
-    </div>
-
-    <div id="page5" class="tab-content">
-        <div class="card">
-            <h3>🏠 房間清單管理</h3>
-            <p style="font-size:12px; color:#747d8c; text-align:center; margin-bottom:15px;">👇 點擊下方房間列表，即可修改未上傳狀態或退出該房間</p>
-            
-            <div id="roomListContainer"></div>
-
-            <div id="roomDetailPanel" class="room-detail-panel">
-                <h4 style="margin-top:0; color:#2f3542; border-bottom:2px solid #f1f2f6; padding-bottom:8px;">🚪 房間 [<span id="selectedRoomCodeTitle"></span>] 管理面板</h4>
-                
-                <div style="background: #f1f2f6; padding: 12px; margin-bottom: 15px; border-radius: 12px;">
-                    <label style="margin-top:0; color:#2f3542;">🎨 更改此房「未上傳狀態」文字：</label>
-                    <div style="font-size: 11px; color:#747d8c; margin-bottom: 6px;">目前顯示預設：<strong id="currentEmptyPlaceholderStatus" style="color:#ff7675; font-size:13px;">💤</strong></div>
-                    <div style="display:flex; gap:8px;">
-                        <input type="text" id="customEmptyStatusInput" placeholder="例如: Zzz, 👀, 偷懶中" style="margin-bottom:0; padding:8px;">
-                        <button onclick="broadcastCustomEmptyStatus()" style="width:auto; padding:0 15px; background:#747d8c;">更換</button>
-                    </div>
-                </div>
-
-                <label>👥 房內在線成員：</label>
-                <div id="manageMembersContainer" style="margin-bottom: 15px;"></div>
-
-                <button onclick="deleteAndExitRoomFromList()" style="background:#ff7675; margin-bottom: 10px;">🗑️ 刪除並退出此房間</button>
-            </div>
-
-            <hr style="border:0; border-top:1px solid #e4e7eb; margin-top:20px; margin-bottom:15px;">
-            <label>📸 我今天已發布的時段紀錄 (全部房間)：</label>
-            <div id="myUploadsContainer"></div>
-        </div>
-    </div>
-
-    <div class="navbar">
-        <div class="nav-item active" id="nav1" onclick="switchTab(0)">🔑 設定</div>
-        <div class="nav-item" id="nav2" onclick="switchTab(1)">🕒 發布日常</div>
-        <div class="nav-item" id="nav3" onclick="switchTab(2)">👀 看看大家</div>
-        <div class="nav-item" id="nav4" onclick="switchTab(3)">🎬 影片生成</div>
-        <div class="nav-item" id="nav5" onclick="switchTab(4)">🏠 房間管理</div>
-    </div>
-
-    <script>
-        let socket; let userAvatarBase64 = ""; let currentRawVideoSrc = ""; let megaDB = {};
-        let myRoomList = ["123"]; // 💥 紀錄我加入過的所有房間列表
-        let roomEmptySettings = {}; // 💥 各房間專屬的未上傳符號對照表 { roomCode: "💤" }
-        let currentSelectedRoomCode = ""; // 目前在管理頁面點擊選中的房號
-        let globalCachedMembers = [];
-        const fullDayHours = []; for(let i=0; i<24; i++) { fullDayHours.push((i < 10 ? '0' + i : i) + ':00'); }
-
-        window.onload = function() {
-            const today = new Date();
-            document.getElementById('diaryDate').value = today.toISOString().split('T')[0];
-
-            if(localStorage.getItem("mini2s_myRoomList")) {
-                myRoomList = JSON.parse(localStorage.getItem("mini2s_myRoomList"));
-            }
-            if(localStorage.getItem("mini2s_roomEmptySettings")) {
-                roomEmptySettings = JSON.parse(localStorage.getItem("mini2s_roomEmptySettings"));
-            }
-
-            socket = io();
-            socket.on('connect', () => { saveProfileAndJoin(); });
-
-            socket.on('room-members-update', (data) => {
-                // 收到多房間格式的成員名單
-                globalCachedMembers = data.members || [];
-                const activeRoom = document.getElementById("activeRoomSelect").value;
-                if(data.roomCode === activeRoom) {
-                    renderRoomMembersUI(globalCachedMembers);
-                }
-                if(currentSelectedRoomCode === data.roomCode) {
-                    renderSelectedRoomMembersOnly(globalCachedMembers);
-                }
-            });
-
-            socket.on('update-room-empty-status', (data) => {
-                if(data && data.roomCode) {
-                    roomEmptySettings[data.roomCode] = data.statusText;
-                    localStorage.setItem("mini2s_roomEmptySettings", JSON.stringify(roomEmptySettings));
-                    
-                    if(data.roomCode === currentSelectedRoomCode) {
-                        document.getElementById("currentEmptyPlaceholderStatus").innerText = data.statusText;
-                    }
-                    updateLivePublishGrid();
-                    refreshWatchGridUI();
-                }
-            });
-
-            socket.on('new-diary-broadcast', (data) => {
-                const d = data.date; const h = data.hour; const u = data.userName; const r = data.roomCode;
-                if (!megaDB[d]) megaDB[d] = initDateHours();
-                if (!megaDB[d][h]) megaDB[d][h] = {};
-                if (!megaDB[d][h][r]) megaDB[d][h][r] = {};
-
-                megaDB[d][h][r][u] = {
-                    text: data.text, avatar: data.avatar, video: data.video,
-                    timeStart: data.timeStart || 0, yAlign: data.yAlign || 50, region: data.region || "🇹🇼 台灣"
-                };
-                localStorage.setItem("mini2s_megaDB", JSON.stringify(megaDB));
-                
-                const activeTabId = document.querySelector('.nav-item.active').id;
-                if (activeTabId === "nav2") updateLivePublishGrid();
-                if (activeTabId === "nav3") refreshWatchGridUI();
-                if (activeTabId === "nav5") renderManagementPageUI();
-            });
-
-            if(localStorage.getItem("mini2s_userName")) document.getElementById("userName").value = localStorage.getItem("mini2s_userName");
-            if(localStorage.getItem("mini2s_userRegion")) document.getElementById("userRegion").value = localStorage.getItem("mini2s_userRegion");
-            if(localStorage.getItem("mini2s_customAvatar")) {
-                userAvatarBase64 = localStorage.getItem("mini2s_customAvatar");
-                document.getElementById("avatarImage").src = userAvatarBase64;
-            }
-            megaDB = localStorage.getItem("mini2s_megaDB") ? JSON.parse(localStorage.getItem("mini2s_megaDB")) : {};
-            
-            updateRoomSelectOptions();
-            saveProfileAndJoin();
-            updateLivePublishGrid();
-            syncInputText();
-        };
-
-        function initDateHours() { let obj = {}; fullDayHours.forEach(h => obj[h] = {}); return obj; }
-
-        function handleAvatarFile(input) {
-            const file = input.files[0]; if (!file) return;
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                userAvatarBase64 = e.target.result;
-                document.getElementById("avatarImage").src = userAvatarBase64;
-                localStorage.setItem("mini2s_customAvatar", userAvatarBase64);
-                saveProfileAndJoin();
-                updateLivePublishGrid();
-            };
-            reader.readAsDataURL(file);
-        }
-
-        function getActiveDateDB() { const date = document.getElementById('diaryDate').value; if(!megaDB[date]) megaDB[date] = initDateHours(); return megaDB[date]; }
-        
-        function GetRoomUserList(hour, roomCode) {
-            const dateDB = getActiveDateDB();
-            const myName = document.getElementById("userName").value || "未命名";
-            const userSet = new Set([myName]);
-            if(dateDB[hour] && dateDB[hour][roomCode]) { 
-                Object.keys(dateDB[hour][roomCode]).forEach(u => userSet.add(u)); 
-            }
-            return Array.from(userSet).slice(0, 4);
-        }
-
-        // 💥 新增房間代碼動作
-        function addNewRoomCodeAction() {
-            const code = document.getElementById("roomCode").value.trim();
-            if(!code) return alert("請輸入房間代碼！");
-            if(!myRoomList.includes(code)) {
-                myRoomList.push(code);
-                localStorage.setItem("mini2s_myRoomList", JSON.stringify(myRoomList));
-            }
-            updateRoomSelectOptions();
-            document.getElementById("activeRoomSelect").value = code;
-            handleActiveRoomToggle();
-            saveProfileAndJoin();
-            switchTab(1);
-        }
-
-        function updateRoomSelectOptions() {
-            const s2 = document.getElementById("activeRoomSelect");
-            const s3 = document.getElementById("watchRoomSelect");
-            const s4 = document.getElementById("renderRoomSelect");
-            
-            let html = "";
-            myRoomList.forEach(r => { html += `<option value="${r}">${r}</option>`; });
-            
-            if(s2) s2.innerHTML = html;
-            if(s3) s3.innerHTML = html;
-            if(s4) s4.innerHTML = html;
-        }
-
-        function handleActiveRoomToggle() {
-            const activeRoom = document.getElementById("activeRoomSelect").value;
-            document.getElementById("currentPublishRoomTitle").innerText = activeRoom;
-            updateLivePublishGrid();
-            syncInputText();
-            if(socket && socket.connected) {
-                socket.emit('get-room-members', { roomCode: activeRoom });
-            }
-        }
-
-        function renderRoomMembersUI(members) {
-            const bar = document.getElementById("roomMembersList");
-            if(!bar) return; bar.innerHTML = "";
-            const myName = document.getElementById("userName").value || "未命名";
-            
-            let uniqueList = [{ userName: myName, avatar: userAvatarBase64 }];
-            members.forEach(m => {
-                if(m.userName !== myName) uniqueList.push(m);
-            });
-
-            uniqueList.slice(0, 4).forEach(m => {
-                const defaultSvg = "data:image/svg+xml;utf8,<svg viewBox='0 0 24 24' fill='%23a4b0be'><path d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z'/></svg>";
-                bar.innerHTML += `
-                    <div class="member-chip">
-                        <img class="member-chip-avatar" src="${m.avatar || defaultSvg}">
-                        <span class="member-chip-name">${m.userName}</span>
-                    </div>
-                `;
-            });
-        }
-
-        // 💥 核心功能：點擊清單中的房間展開管理
-        function clickRoomToManage(roomCode) {
-            currentSelectedRoomCode = roomCode;
-            document.getElementById("selectedRoomCodeTitle").innerText = roomCode;
-            
-            const currentEmpty = roomEmptySettings[roomCode] || "💤";
-            document.getElementById("currentEmptyPlaceholderStatus").innerText = currentEmpty;
-            
-            document.getElementById("roomDetailPanel").style.display = "block";
-            
-            if(socket && socket.connected) {
-                socket.emit('get-room-members', { roomCode: roomCode });
-            } else {
-                renderSelectedRoomMembersOnly([]);
-            }
-        }
-
-        function renderSelectedRoomMembersOnly(members) {
-            const container = document.getElementById("manageMembersContainer");
-            if(!container) return; container.innerHTML = "";
-            const myName = document.getElementById("userName").value || "未命名";
-            
-            let currentList = [{ userName: myName, avatar: userAvatarBase64 }];
-            members.forEach(m => { if(m.userName !== myName) currentList.push(m); });
-
-            currentList.forEach(m => {
-                container.innerHTML += `
-                    <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px; background:#f1f2f6; padding:8px; border-radius:8px;">
-                        <img src="${m.avatar || 'data:image/svg+xml;utf8,<svg viewBox=\'0 0 24 24\' fill=\'%23a4b0be\'><path d=\'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z\'/></svg>'}" style="width:24px; height:24px; border-radius:50%; object-fit:cover;">
-                        <span style="font-size:13px; font-weight:bold;">${m.userName} ${m.userName === myName ? '(你)' : ''}</span>
-                    </div>
-                `;
-            });
-        }
-
-        function broadcastCustomEmptyStatus() {
-            if(!currentSelectedRoomCode) return;
-            const inputVal = document.getElementById("customEmptyStatusInput").value.trim();
-            if(!inputVal) return alert("請輸入狀態符號文字唷！🎨");
-            
-            if(socket && socket.connected) {
-                socket.emit('change-room-empty-status', { roomCode: currentSelectedRoomCode, statusText: inputVal });
-                document.getElementById("customEmptyStatusInput").value = "";
-            } else {
-                roomEmptySettings[currentSelectedRoomCode] = inputVal;
-                localStorage.setItem("mini2s_roomEmptySettings", JSON.stringify(roomEmptySettings));
-                document.getElementById("currentEmptyPlaceholderStatus").innerText = inputVal;
-                updateLivePublishGrid();
-                refreshWatchGridUI();
-            }
-        }
-
-        function deleteAndExitRoomFromList() {
-            if(!currentSelectedRoomCode) return;
-            if(!confirm(`確定要刪除並退出房間 [${currentSelectedRoomCode}] 嗎？`)) return;
-            
-            myRoomList = myRoomList.filter(r => r !== currentSelectedRoomCode);
-            localStorage.setItem("mini2s_myRoomList", JSON.stringify(myRoomList));
-            
-            if(socket && socket.connected) {
-                socket.emit('exit-room', { roomCode: currentSelectedRoomCode });
-            }
-            
-            document.getElementById("roomDetailPanel").style.display = "none";
-            currentSelectedRoomCode = "";
-            updateRoomSelectOptions();
-            renderManagementPageUI();
-            updateLivePublishGrid();
-        }
-
-        function renderManagementPageUI() {
-            const listContainer = document.getElementById("roomListContainer");
-            if(listContainer) {
-                listContainer.innerHTML = "";
-                if(myRoomList.length === 0) {
-                    listContainer.innerHTML = `<p style="text-align:center;font-size:13px;color:#a4b0be;">目前沒有任何房間紀錄，請前往設定頁加入！</p>`;
-                }
-                // 💥 核心需求：一行一行顯示房間
-                myRoomList.forEach(r => {
-                    const currentEmptyStr = roomEmptySettings[r] || "💤";
-                    listContainer.innerHTML += `
-                        <div class="room-item-row" onclick="clickRoomToManage('${r}')">
-                            <span>🏠 房間代碼：${r}</span>
-                            <span style="font-size:12px; color:#747d8c; background:#fff; padding:4px 8px; border-radius:10px;">預設: ${currentEmptyStr} ➔</span>
-                        </div>
-                    `;
-                });
-            }
-
-            // 顯示我的今日上傳列表
-            const uploadsContainer = document.getElementById("myUploadsContainer");
-            if(uploadsContainer) {
-                uploadsContainer.innerHTML = "";
-                const dateDB = getActiveDateDB();
-                const myName = document.getElementById("userName").value || "未命名";
-                let hasRecords = false;
-
-                fullDayHours.forEach(h => {
-                    if(dateDB[h]) {
-                        myRoomList.forEach(r => {
-                            if(dateDB[h][r] && dateDB[h][r][myName] && dateDB[h][r][myName].video) {
-                                hasRecords = true;
-                                uploadsContainer.innerHTML += `
-                                    <div class="manage-item-row">
-                                        <div class="manage-item-info">🚪[${r}] ⏰ ${h} ➔ <span style="color:#747d8c;">"${dateDB[h][r][myName].text}"</span></div>
-                                        <button class="btn-danger-small" onclick="deleteMyDiaryRecord('${h}', '${r}')">🗑️ 刪除</button>
-                                    </div>
-                                ];
-                            }
-                        });
-                    }
-                });
-
-                if(!hasRecords) {
-                    uploadsContainer.innerHTML = `<p style="font-size:12px; color:#a4b0be; text-align:center;">目前所有房間都還沒有發布日常影片唷！</p>`;
-                }
-            }
-        }
-
-        function deleteMyDiaryRecord(hour, roomCode) {
-            if(!confirm(`確定要刪除房間 [${roomCode}] 在 ${hour} 的紀錄嗎？`)) return;
-            const date = document.getElementById('diaryDate').value;
-            const myName = document.getElementById("userName").value || "未命名";
-            const dateDB = getActiveDateDB();
-
-            if(dateDB[hour] && dateDB[hour][roomCode] && dateDB[hour][roomCode][myName]) {
-                delete dateDB[hour][roomCode][myName];
-                localStorage.setItem("mini2s_megaDB", JSON.stringify(megaDB));
-                
-                if(socket && socket.connected) {
-                    socket.emit('share-diary', {
-                        roomCode: roomCode, userName: myName, date: date, hour: hour,
-                        text: "", avatar: "", video: "", timeStart: 0, yAlign: 50, region: ""
-                    });
-                }
-                alert("已成功刪除該時段紀錄！");
-                renderManagementPageUI();
-                updateLivePublishGrid();
-            }
-        }
-
-        function updateLivePublishGrid() {
-            const gridContainer = document.getElementById("publishQuadGrid");
-            if(!gridContainer) return; gridContainer.innerHTML = "";
-
-            const activeRoom = document.getElementById("activeRoomSelect").value;
-            if(!activeRoom) return;
-
-            const hour = document.getElementById("currentHour").value;
-            const text = document.getElementById("statusText").value || "";
-            const myName = document.getElementById("userName").value || "未命名";
-            const reg = document.getElementById("userRegion").value || "🇹🇼 台灣";
-            const dateDB = getActiveDateDB();
-            const userList = GetRoomUserList(hour, activeRoom);
-            const activeRoomEmptyPlaceholder = roomEmptySettings[activeRoom] || "💤";
-
-            for(let i=0; i<4; i++) {
-                const user = userList[i];
-                const cell = document.createElement("div");
-                cell.className = "grid-cell";
-
-                if(user === myName) {
-                    if(currentRawVideoSrc) {
-                        cell.innerHTML = `
-                            <div class="cell-overlay-time-box">
-                                <div class="cell-time-title">${hour}</div>
-                                <div class="cell-desc-title">${text}</div>
-                            </div>
-                            <div class="cell-profile-badge">
-                                <img class="cell-badge-avatar" src="${userAvatarBase64 || 'data:image/svg+xml;utf8,<svg viewBox=\'0 0 24 24\' fill=\'%23a4b0be\'><path d=\'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z\'/></svg>'}">
-                                <span class="cell-badge-name">${myName} ${reg}</span>
-                            </div>
-                            <video class="grid-cell-video" id="liveEditVideoRef" loop muted playsinline src="${currentRawVideoSrc}"></video>
-                        `;
-                    } else {
-                        cell.innerHTML = `
-                            <div class="cell-empty-placeholder">
-                                <div class="cell-empty-time">${hour}</div>
-                                <span style="font-size:24px; margin-bottom:5px;">${activeRoomEmptyPlaceholder}</span>
-                                <span style="font-size:11px; font-weight:bold;">👉 點上方添加影片</span>
-                            </div>
-                        `;
-                    }
-                } else if(user && dateDB[hour] && dateDB[hour][activeRoom] && dateDB[hour][activeRoom][user] && dateDB[hour][activeRoom][user].text) {
-                    const uData = dateDB[hour][activeRoom][user];
-                    cell.innerHTML = `
-                        <div class="cell-overlay-time-box">
-                            <div class="cell-time-title">${hour}</div>
-                            <div class="cell-desc-title">${uData.text}</div>
-                        </div>
-                        <div class="cell-profile-badge">
-                            <img class="cell-badge-avatar" src="${uData.avatar || 'data:image/svg+xml;utf8,<svg viewBox=\'0 0 24 24\' fill=\'%23a4b0be\'><path d=\'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z\'/></svg>'}">
-                            <span class="cell-badge-name">${user} ${uData.region || "🇹🇼 台灣"}</span>
-                        </div>
-                        <video class="grid-cell-video" loop autoplay muted playsinline src="${uData.video}" style="object-position: center ${uData.yAlign}%;"></video>
-                    `;
-                } else {
-                    cell.innerHTML = `
-                        <div class="cell-empty-placeholder">
-                            <div class="cell-empty-time">${hour}</div>
-                            <span style="font-size:24px;">${activeRoomEmptyPlaceholder}</span>
-                        </div>
-                    `;
-                }
-                gridContainer.appendChild(cell);
-            }
-
-            if(currentRawVideoSrc) {
-                const editVid = document.getElementById("liveEditVideoRef");
-                if(editVid) {
-                    editVid.onloadedmetadata = function() { editVid.play(); updateVideoCropPreview(); }
-                }
-            }
-        }
-
-        function prepareVideoEditor(input) {
-            const file = input.files[0]; if (!file) return;
-            document.getElementById('timerStatus').innerText = "⏳ 載入影片中...";
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                currentRawVideoSrc = e.target.result;
-                document.getElementById("tweakControlPanel").style.display = "block";
-                document.getElementById("timeOffsetSlider").value = 0;
-                document.getElementById("vOffsetSlider").value = 50;
-                document.getElementById('timerStatus').innerText = "✨ 請調整畫面中心！";
-                updateLivePublishGrid();
-            };
-            reader.readAsDataURL(file);
-        }
-
-        function updateVideoCropPreview() {
-            const videoEl = document.getElementById("liveEditVideoRef"); if(!videoEl) return;
-            const timeStart = parseFloat(document.getElementById("timeOffsetSlider").value);
-            const yAlign = document.getElementById("vOffsetSlider").value;
-            document.getElementById("timeVal").innerText = timeStart.toFixed(1) + "s";
-            document.getElementById("yVal").innerText = yAlign + "%";
-            if(videoEl.duration) { document.getElementById("timeOffsetSlider").max = Math.max(0, videoEl.duration - 2); }
-            videoEl.currentTime = timeStart;
-            videoEl.style.objectPosition = `center ${yAlign}%`;
-        }
-
-        function submitDiaryToServer() {
-            const textInput = document.getElementById('statusText').value;
-            if(!textInput || !currentRawVideoSrc) return alert("請填寫狀態並選擇影片唷！🎬");
-
-            const date = document.getElementById('diaryDate').value;
-            const hour = document.getElementById('currentHour').value;
-            const uName = document.getElementById("userName").value || "未命名";
-            const activeRoom = document.getElementById("activeRoomSelect").value;
-            const reg = document.getElementById("userRegion").value;
-            
-            if(!activeRoom) return alert("你目前沒有在任何房間中！");
-            const dateDB = getActiveDateDB();
-
-            if(!dateDB[hour][activeRoom]) dateDB[hour][activeRoom] = {};
-            dateDB[hour][activeRoom][uName] = {
-                text: textInput, avatar: userAvatarBase64, video: currentRawVideoSrc,
-                timeStart: parseFloat(document.getElementById("timeOffsetSlider").value),
-                yAlign: parseInt(document.getElementById("vOffsetSlider").value),
-                region: reg
-            };
-            localStorage.setItem("mini2s_megaDB", JSON.stringify(megaDB));
-
-            if(socket && socket.connected) {
-                socket.emit('share-diary', {
-                    roomCode: activeRoom, userName: uName, date: date, hour: hour,
-                    text: textInput, avatar: userAvatarBase64, video: currentRawVideoSrc,
-                    timeStart: dateDB[hour][activeRoom][uName].timeStart, yAlign: dateDB[hour][activeRoom][uName].yAlign, region: reg
-                });
-            }
-
-            alert("生成成功");
-            clearPublishPage();
-        }
-
-        function clearPublishPage() {
-            document.getElementById('statusText').value = "";
-            document.getElementById("tweakControlPanel").style.display = "none";
-            document.getElementById('timerStatus').innerText = "";
-            document.getElementById('cameraVideoInput').value = "";
-            document.getElementById('fileVideoInput').value = "";
-            currentRawVideoSrc = "";
-            updateLivePublishGrid();
-        }
-
-        function refreshWatchGridUI() {
-            const gridContainer = document.getElementById("watchQuadGrid");
-            if(!gridContainer) return; gridContainer.innerHTML = "";
-
-            const watchRoom = document.getElementById("watchRoomSelect").value;
-            if(!watchRoom) return;
-
-            const hour = document.getElementById("watchHourSelect").value;
-            const dateDB = getActiveDateDB();
-            const userList = GetRoomUserList(hour, watchRoom);
-            const activePlaceholder = roomEmptySettings[watchRoom] || "💤";
-
-            for(let i=0; i<4; i++) {
-                const user = userList[i];
-                const cell = document.createElement("div");
-                cell.className = "grid-cell";
-
-                if(user && dateDB[hour] && dateDB[hour][watchRoom] && dateDB[hour][watchRoom][user] && dateDB[hour][watchRoom][user].text) {
-                    const uData = dateDB[hour][watchRoom][user];
-                    cell.innerHTML = `
-                        <div class="cell-overlay-time-box">
-                            <div class="cell-time-title">${hour}</div>
-                            <div class="cell-desc-title">${uData.text}</div>
-                        </div>
-                        <div class="cell-profile-badge">
-                            <img class="cell-badge-avatar" src="${uData.avatar || 'data:image/svg+xml;utf8,<svg viewBox=\'0 0 24 24\' fill=\'%23a4b0be\'><path d=\'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z\'/></svg>'}">
-                            <span class="cell-badge-name">${user} ${uData.region || "🇹🇼 台灣"}</span>
-                        </div>
-                        <video class="grid-cell-video" loop autoplay muted playsinline src="${uData.video}" style="object-position: center ${uData.yAlign}%;"></video>
-                    `;
-                } else {
-                    cell.innerHTML = `
-                        <div class="cell-empty-placeholder">
-                            <div class="cell-empty-time">${hour}</div>
-                            <span style="font-size:24px;">${activePlaceholder}</span>
-                        </div>
-                    `;
-                }
-                gridContainer.appendChild(cell);
-            }
-        }
-
-        function saveProfileAndJoin() {
-            const uName = document.getElementById("userName").value || "未命名";
-            const reg = document.getElementById("userRegion").value;
-            localStorage.setItem("mini2s_userName", uName);
-            localStorage.setItem("mini2s_userRegion", reg);
-            
-            if(socket && socket.connected && myRoomList.length > 0) {
-                socket.emit('join-multiple-rooms', { rooms: myRoomList, userName: uName, avatar: userAvatarBase64 });
-            }
-        }
-
-        function handleDateChange() { 
-            syncInputText(); 
-            const activeTabId = document.querySelector('.nav-item.active').id;
-            if (activeTabId === "nav2") updateLivePublishGrid();
-            if (activeTabId === "nav3") refreshWatchGridUI();
-            if (activeTabId === "nav5") renderManagementPageUI();
-        }
-        
-        function syncInputText() { 
-            const hour = document.getElementById('currentHour').value; 
-            const uName = document.getElementById("userName").value || "未命名"; 
-            const activeRoom = document.getElementById("activeRoomSelect").value;
-            const dateDB = getActiveDateDB(); 
-            document.getElementById('statusText').value = (dateDB[hour] && dateDB[hour][activeRoom] && dateDB[hour][activeRoom][uName]) ? dateDB[hour][activeRoom][uName].text : ""; 
-        }
-
-        function switchTab(tabIndex) { 
-            document.querySelectorAll('.tab-content').forEach(p => p.classList.remove('active')); 
-            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active')); 
-            document.querySelectorAll('.tab-content')[tabIndex].classList.add('active'); 
-            document.querySelectorAll('.nav-item')[tabIndex].classList.add('active'); 
-            if(tabIndex === 1) handleActiveRoomToggle();
-            if(tabIndex === 2) refreshWatchGridUI(); 
-            if(tabIndex === 4) renderManagementPageUI(); 
-        }
-
-        async function renderMegaFullDayVideo() {
-            const canvas = document.getElementById('canvasStage'); const ctx = canvas.getContext('2d');
-            const outputArea = document.getElementById('megaOutputArea'); 
-            const dateDB = getActiveDateDB();
-            const myCurrentName = document.getElementById("userName").value || "未命名";
-            const rCode = document.getElementById("renderRoomSelect").value;
-
-            if(!rCode) return alert("請選擇要生成的房間！");
-            const activePlaceholder = roomEmptySettings[rCode] || "💤";
-
-            let activeHours = Object.keys(dateDB).filter(h => dateDB[h][rCode] && Object.keys(dateDB[h][rCode]).some(u => dateDB[h][rCode][u] && dateDB[h][rCode][u].video)).sort();
-            
-            if(activeHours.length === 0) { 
-                outputArea.innerHTML = "<p style='color:#2f3542;font-weight:bold;'>❌ 此房間今天沒有任何人上傳動態！</p>"; return; 
-            }
-
-            outputArea.innerHTML = `<p style='color:#747d8c; font-weight:bold;'>生成中</p>`;
-            const stream = canvas.captureStream(24);
-            const recorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
-            let chunks = []; recorder.ondataavailable = (e) => chunks.push(e.data);
-            recorder.onstop = () => {
-                const blob = new Blob(chunks, { type: 'video/mp4' }); const url = URL.createObjectURL(blob);
-                outputArea.innerHTML = `
-                    <p style="color:#2ed573; font-weight:bold;">🎉 24H 終極大片生成成功！</p>
-                    <video src="${url}" controls autoplay style="width:100%; max-width:320px; border-radius:12px; margin-top:10px;"></video>
-                    <a href="${url}" download="Diary_24H_Room_${rCode}.mp4" style="color:#2f3542; text-decoration:none; font-weight:bold; display:block; margin-top:8px;">📥 下載 MP4</a>`;
-            };
-            recorder.start();
-
-            const userSet = new Set([myCurrentName]);
-            activeHours.forEach(h => { if(dateDB[h][rCode]) Object.keys(dateDB[h][rCode]).forEach(u => userSet.add(u)); });
-            const userList = Array.from(userSet).slice(0, 4);
-
-            const loadedAvatars = {};
-            for (let u of userList) {
-                let src = "data:image/svg+xml;utf8,<svg viewBox='0 0 24 24' fill='%23a4b0be'><path d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z'/></svg>";
-                for (let h of activeHours) { if (dateDB[h] && dateDB[h][rCode] && dateDB[h][rCode][u] && dateDB[h][rCode][u].avatar) { src = dateDB[h][rCode][u].avatar; break; } }
-                const img = new Image(); img.src = src; await new Promise(r => img.onload = r); loadedAvatars[u] = img;
-            }
-
-            const cellW = canvas.width / 2; const cellH = canvas.height / 2;
-            const gridCoords = [{ x: 0, y: 0 }, { x: cellW, y: 0 }, { x: 0, y: cellH }, { x: cellW, y: cellH }];
-
-            for (let h of activeHours) {
-                const vElements = {};
-                for (let u of userList) {
-                    if (dateDB[h] && dateDB[h][rCode] && dateDB[h][rCode][u] && dateDB[h][rCode][u].video) {
-                        const v = document.createElement('video'); v.src = dateDB[h][rCode][u].video; v.muted = true; v.playsInline = true;
-                        v.currentTime = dateDB[h][rCode][u].timeStart || 0; v.play(); vElements[u] = v;
-                    }
-                }
-
-                let startRun = Date.now();
-                while (Date.now() - startRun < 2000) {
-                    ctx.fillStyle = '#1e1e1e'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-                    for (let i = 0; i < 4; i++) {
-                        const u = userList[i]; if (!u) continue;
-                        const coord = gridCoords[i];
-                        const uData = (dateDB[h] && dateDB[h][rCode]) ? dateDB[h][rCode][u] : null;
-
-                        ctx.save(); ctx.beginPath(); ctx.rect(coord.x, coord.y, cellW, cellH); ctx.clip();
-
-                        if (uData && uData.video && vElements[u] && vElements[u].videoWidth > 0) {
-                            const video = vElements[u];
-                            let scale = Math.max(cellW / video.videoWidth, cellH / video.videoHeight);
-                            let drawW = video.videoWidth * scale; let drawH = video.videoHeight * scale;
-                            let drawX = coord.x + (cellW - drawW) / 2;
-                            let drawY = coord.y + (cellH - drawH) * ((uData.yAlign || 50) / 100);
-                            
-                            ctx.drawImage(video, drawX, drawY, drawW, drawH);
-                            ctx.fillStyle = "rgba(0, 0, 0, 0.12)"; ctx.fillRect(coord.x, coord.y, cellW, cellH);
-                            ctx.fillStyle = "#ffffff"; ctx.textAlign = "center"; ctx.shadowColor = "rgba(0,0,0,0.6)"; ctx.shadowBlur = 8;
-                            ctx.font = "800 32px 'Lexend', sans-serif"; ctx.fillText(h, coord.x + cellW / 2, coord.y + (cellH / 2) - 10);
-                            ctx.font = "bold 20px sans-serif"; ctx.fillText(uData.text, coord.x + cellW / 2, coord.y + (cellH / 2) + 30);
-                            ctx.shadowBlur = 0;
-
-                            const regionDisplay = uData.region || "";
-                            const bx = coord.x + 12; const by = coord.y + 12;
-                            ctx.fillStyle = "rgba(0, 0, 0, 0.3)"; ctx.beginPath(); ctx.roundRect(bx, by, 125, 26, 13); ctx.fill();
-
-                            if (loadedAvatars[u]) {
-                                ctx.save(); ctx.beginPath(); ctx.arc(bx + 13, by + 13, 9, 0, Math.PI * 2); ctx.clip();
-                                ctx.drawImage(loadedAvatars[u], bx + 4, by + 4, 18, 18); ctx.restore();
-                            }
-                            ctx.fillStyle = "#ffffff"; ctx.textAlign = "left"; ctx.font = "bold 11px sans-serif";
-                            ctx.fillText(`${u} ${regionDisplay.substring(0,6)}`, bx + 28, by + 17);
-                        } else {
-                            ctx.fillStyle = '#121212'; ctx.fillRect(coord.x, coord.y, cellW, cellH);
-                            ctx.fillStyle = 'rgba(255,255,255,0.2)'; ctx.textAlign = "center";
-                            ctx.font = "800 30px 'Lexend', sans-serif"; ctx.fillText(h, coord.x + cellW / 2, coord.y + (cellH / 2) - 15);
-                            ctx.font = "30px sans-serif"; ctx.fillText(activePlaceholder, coord.x + cellW / 2, coord.y + (cellH / 2) + 25);
-                        }
-                        ctx.restore();
-                    }
-                    await new Promise(r => setTimeout(r, 40));
-                }
-                for(let u in vElements) { vElements[u].pause(); vElements[u].src=""; vElements[u].load(); }
-            }
-            recorder.stop();
-        }
-    </script>
-</body>
+<h1>Diary</h1>
+<div id="connStatus" style="text-align:center;font-size:12px;color:#2ed573;font-weight:bold;margin-bottom:10px;">🟢 已連線</div>
+<div class="room-members-bar">
+<div class="member-bar-title">🏡 目前房間成員：</div>
+<div id="roomMembersList" style="display:flex;gap:8px;align-items:center;"></div>
+</div>
+<div class="date-selector-box">
+<label>📅 日記日期：</label>
+<input type="date" id="diaryDate" class="date-picker-input" onchange="handleDateChange()">
+</div>
+<div id="page1" class="tab-content active">
+<div class="card">
+<h3>🔑 個人與自定義地區</h3>
+<label>名字：</label>
+<input type="text" id="userName" value="" placeholder="請輸入名字" onchange="saveProfileAndJoin();updateLivePublishGrid();">
+<label>大頭貼：</label>
+<div class="avatar-uploader" style="display:flex;flex-direction:column;align-items:center;margin:10px 0;">
+<div style="width:70px;height:70px;border-radius:50%;border:2px dashed #2f3542;background:#f1f2f6;display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:pointer;" onclick="document.getElementById('avatarFileInput').click()">
+<img id="avatarImage" style="width:100%;height:100%;object-fit:cover;" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23a4b0be'><path d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z'/></svg>">
+</div>
+<input type="file" id="avatarFileInput" accept="image/*" style="display:none;" onchange="handleAvatarFile(this)">
+</div>
+<label>📍 目前所在地區：</label>
+<input type="text" id="userRegion" value="🇹🇼 台灣" placeholder="可自由修改地區" onchange="saveProfileAndJoin();updateLivePublishGrid();">
+<label>輸入想進入/新增的房間代碼：</label>
+<input type="text" id="roomCode" value="123" placeholder="例如: 123">
+<button onclick="addNewRoomCodeAction()">進入該房間 ➔</button>
+</div>
+</div>
+<div id="page2" class="tab-content">
+<div class="card">
+<h3>🕒 當地時段發布 (目前房號: <span id="currentPublishRoomTitle" style="color:#ff7675;">-</span>)</h3>
+<label>當前操作房號切換：</label>
+<select id="activeRoomSelect" onchange="handleActiveRoomToggle()"></select>
+<label>當地時間：</label>
+<select id="currentHour" onchange="syncInputText();updateLivePublishGrid();">
+<script>
+for(let i=0;i<24;i++){
+let h=(i<10?'0':'')+i+':00';
+document.write(`<option value="${h}" ${i===10?'selected':''}>${h}</option>`);
+}
+</script>
+</select>
+<label>當下在幹嘛（狀態文字）：</label>
+<input type="text" id="statusText" placeholder="" oninput="updateLivePublishGrid()">
+<label>添加影片：</label>
+<div class="upload-options-group">
+<div class="upload-opt-btn" onclick="document.getElementById('cameraVideoInput').click()">📸 相機拍攝</div>
+<div class="upload-opt-btn" onclick="document.getElementById('fileVideoInput').click()">📁 手機相簿</div>
+</div>
+<input type="file" id="cameraVideoInput" accept="video/*" capture="camera" style="display:none;" onchange="prepareVideoEditor(this)">
+<input type="file" id="fileVideoInput" accept="video/*" style="display:none;" onchange="prepareVideoEditor(this)">
+<label>🎬 發布對齊預覽牆：</label>
+<div class="quad-grid-stage" id="publishQuadGrid"></div>
+<div id="tweakControlPanel">
+<div class="range-control-group">
+<label style="color:#fff;font-size:11px;"><span id="timeVal">0.0s</span></label>
+<input type="range" id="timeOffsetSlider" class="range-slider" min="0" max="10" step="0.1" value="0" oninput="updateVideoCropPreview()">
+</div>
+<div class="range-control-group">
+<label style="color:#fff;font-size:11px;">↕️ 畫面上下移動置中: <span id="yVal">50%</span></label>
+<input type="range" id="vOffsetSlider" class="range-slider" min="0" max="100" value="50" oninput="updateVideoCropPreview()">
+</div>
+</div>
+<button id="uploadBtn" onclick="submitDiaryToServer()" style="margin-top:15px;">🚀 發布日常動態</button>
+<p id="timerStatus" style="color:#2ed573;font-weight:bold;text-align:center;margin-top:8px;font-size:13px;"></p>
+</div>
+</div>
+<div id="page3" class="tab-content">
+<div class="card">
+<h3>看看大家在幹嘛</h3>
+<label>選擇觀看房間：</label>
+<select id="watchRoomSelect" onchange="refreshWatchGridUI()"></select>
+<label>選擇觀看時段：</label>
+<select id="watchHourSelect" onchange="refreshWatchGridUI()">
+<script>
+for(let i=0;i<24;i++){
+let h=(i<10?'0':'')+i+':00';
+document.write(`<option value="${h}" ${i===10?'selected':''}>${h}</option>`);
+}
+</script>
+</select>
+<div class="quad-grid-stage" id="watchQuadGrid"></div>
+</div>
+</div>
+<div id="page4" class="tab-content">
+<div class="card">
+<h3>全天 24 小時</h3>
+<label>選擇要生成大片的房間：</label>
+<select id="renderRoomSelect" style="margin-bottom:15px;"></select>
+<button onclick="renderMegaFullDayVideo()" style="background:#2ed573;color:white;padding:15px;font-size:16px;">一鍵生成 24H</button>
+<div id="megaOutputArea" style="margin-top:20px;text-align:center;"></div>
+</div>
+<canvas id="canvasStage" width="540" height="960"></canvas>
+</div>
+<div id="page5" class="tab-content">
+<div class="card">
+<h3>🏠 房間清單管理</h3>
+<p style="font-size:12px;color:#747d8c;text-align:center;margin-bottom:15px;">👇 點擊下方房間列表，即可修改未上傳狀態或退出該房間</p>
+<div id="roomListContainer"></div>
+<div id="roomDetailPanel" class="room-detail-panel">
+<h4 style="margin-top:0;color:#2f3542;border-bottom:2px solid #f1f2f6;padding-bottom:8px;">🚪 房間 [<span id="selectedRoomCodeTitle"></span>] 管理面板</h4>
+<div style="background:#f1f2f6;padding:12px;margin-bottom:15px;border-radius:12px;">
+<label style="margin-top:0;color:#2f3542;">🎨 更改此房「未上傳狀態」文字：</label>
+<div style="font-size:11px;color:#747d8c;margin-bottom:6px;">目前顯示預設：<strong id="currentEmptyPlaceholderStatus" style="color:#ff7675;font-size:13px;">💤</strong></div>
+<div style="display:flex;gap:8px;">
+<input type="text" id="customEmptyStatusInput" placeholder="例如: Zzz, 👀" style="margin-bottom:0;padding:8px;">
+<button onclick="broadcastCustomEmptyStatus()" style="width:auto;padding:0 15px;background:#747d8c;">更換</button>
+</div>
+</div>
+<label>👥 房內在線成員：</label>
+<div id="manageMembersContainer" style="margin-bottom:15px;"></div>
+<button onclick="deleteAndExitRoomFromList()" style="background:#ff7675;margin-bottom:10px;">🗑️ 刪除並退出此房間</button>
+</div>
+<hr style="border:0;border-top:1px solid #e4e7eb;margin-top:20px;margin-bottom:15px;">
+<label>📸 我今天已發布的時段紀錄 (全部房間)：</label>
+<div id="myUploadsContainer"></div>
+</div>
+</div>
+<div class="navbar">
+<div class="nav-item active" id="nav1" onclick="switchTab(0)">🔑 設定</div>
+<div class="nav-item" id="nav2" onclick="switchTab(1)">🕒 發布日常</div>
+<div class="nav-item" id="nav3" onclick="switchTab(2)">👀 看看大家</div>
+<div class="nav-item" id="nav4" onclick="switchTab(3)">🎬 影片生成</div>
+<div class="nav-item" id="nav5" onclick="switchTab(4)">🏠 房間管理</div>
+</div>
+<script>
+let socket;let userAvatarBase64="";let currentRawVideoSrc="";let megaDB={};
+let myRoomList=["123"];let roomEmptySettings={};let currentSelectedRoomCode="";let globalCachedMembers=[];
+const fullDayHours=[];for(let i=0;i<24;i++){fullDayHours.push((i<10?'0'+i:i)+':00');}
+window.onload=function(){
+const today=new Date();
+const twOffset=8*60*60*1000;
+const localTime=new Date(today.getTime()+twOffset);
+document.getElementById('diaryDate').value=localTime.toISOString().split('T')[0];
+if(localStorage.getItem("mini2s_myRoomList")){myRoomList=JSON.parse(localStorage.getItem("mini2s_myRoomList"));}
+if(localStorage.getItem("mini2s_roomEmptySettings")){roomEmptySettings=JSON.parse(localStorage.getItem("mini2s_roomEmptySettings"));}
+socket=io();
+socket.on('connect',()=>{saveProfileAndJoin();});
+socket.on('room-members-update',(data)=>{
+globalCachedMembers=data.members||[];
+const activeRoom=document.getElementById("activeRoomSelect").value;
+if(data.roomCode===activeRoom){renderRoomMembersUI(globalCachedMembers);}
+if(currentSelectedRoomCode===data.roomCode){renderSelectedRoomMembersOnly(globalCachedMembers);}
+});
+socket.on('update-room-empty-status',(data)=>{
+if(data&&data.roomCode){
+roomEmptySettings[data.roomCode]=data.statusText;
+localStorage.setItem("mini2s_roomEmptySettings",JSON.stringify(roomEmptySettings));
+if(data.roomCode===currentSelectedRoomCode){document.getElementById("currentEmptyPlaceholderStatus").innerText=data.statusText;}
+updateLivePublishGrid();refreshWatchGridUI();
+}
+});
+socket.on('new-diary-broadcast',(data)=>{
+const d=data.date;const h=data.hour;const u=data.userName;const r=data.roomCode;
+if(!megaDB[d])megaDB[d]=initDateHours();
+if(!megaDB[d][h])megaDB[d][h]={};
+if(!megaDB[d][h][r])megaDB[d][h][r]={};
+megaDB[d][h][r][u]={text:data.text,avatar:data.avatar,video:data.video,timeStart:data.timeStart||0,yAlign:data.yAlign||50,region:data.region||"🇹🇼 台灣"};
+localStorage.setItem("mini2s_megaDB",JSON.stringify(megaDB));
+const activeTabId=document.querySelector('.nav-item.active').id;
+if(activeTabId==="nav2")updateLivePublishGrid();
+if(activeTabId==="nav3")refreshWatchGridUI();
+if(activeTabId==="nav5")renderManagementPageUI();
+});
+if(localStorage.getItem("mini2s_userName"))document.getElementById("userName").value=localStorage.getItem("mini2s_userName");
+if(localStorage.getItem("mini2s_userRegion"))document.getElementById("userRegion").value=localStorage.getItem("mini2s_userRegion");
+if(localStorage.getItem("mini2s_customAvatar")){userAvatarBase64=localStorage.getItem("mini2s_customAvatar");document.getElementById("avatarImage").src=userAvatarBase64;}
+megaDB=localStorage.getItem("mini2s_megaDB")?JSON.parse(localStorage.getItem("mini2s_megaDB")):{};
+updateRoomSelectOptions();saveProfileAndJoin();updateLivePublishGrid();syncInputText();
+};
+function initDateHours(){let obj={};fullDayHours.forEach(h=>obj[h]={});return obj;}
+function handleAvatarFile(input){
+const file=input.files[0];if(!file)return;
+const reader=new FileReader();
+reader.onload=function(e){userAvatarBase64=e.target.result;document.getElementById("avatarImage").src=userAvatarBase64;localStorage.setItem("mini2s_customAvatar",userAvatarBase64);saveProfileAndJoin();updateLivePublishGrid();};
+reader.readAsDataURL(file);
+}
+function getActiveDateDB(){const date=document.getElementById('diaryDate').value;if(!megaDB[date])megaDB[date]=initDateHours();return megaDB[date];}
+function GetRoomUserList(hour,roomCode){
+const dateDB=getActiveDateDB();const myName=document.getElementById("userName").value||"未命名";const userSet=new Set([myName]);
+if(dateDB[hour]&&dateDB[hour][roomCode]){Object.keys(dateDB[hour][roomCode]).forEach(u=>userSet.add(u));}
+return Array.from(userSet).slice(0,4);
+}
+function addNewRoomCodeAction(){
+const code=document.getElementById("roomCode").value.trim();if(!code)return alert("請輸入房間代碼！");
+if(!myRoomList.includes(code)){myRoomList.push(code);localStorage.setItem("mini2s_myRoomList",JSON.stringify(myRoomList));}
+updateRoomSelectOptions();document.getElementById("activeRoomSelect").value=code;handleActiveRoomToggle();saveProfileAndJoin();switchTab(1);
+}
+function updateRoomSelectOptions(){
+const s2=document.getElementById("activeRoomSelect");const s3=document.getElementById("watchRoomSelect");const s4=document.getElementById("renderRoomSelect");
+let html="";myRoomList.forEach(r=>{html+=`<option value="${r}">${r}</option>`;});
+if(s2)s2.innerHTML=html;if(s3)s3.innerHTML=html;if(s4)s4.innerHTML=html;
+}
+function handleActiveRoomToggle(){
+const activeRoom=document.getElementById("activeRoomSelect").value;document.getElementById("currentPublishRoomTitle").innerText=activeRoom;
+updateLivePublishGrid();syncInputText();if(socket&&socket.connected){socket.emit('get-room-members',{roomCode:activeRoom});}
+}
+function renderRoomMembersUI(members){
+const bar=document.getElementById("roomMembersList");if(!bar)return;bar.innerHTML="";const myName=document.getElementById("userName").value||"未命名";
+let uniqueList=[{userName:myName,avatar:userAvatarBase64}];members.forEach(m=>{if(m.userName!==myName)uniqueList.push(m);});
+uniqueList.slice(0,4).forEach(m=>{
+const defaultSvg="data:image/svg+xml;utf8,<svg viewBox='0 0 24 24' fill='%23a4b0be'><path d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z'/></svg>";
+bar.innerHTML+=`<div class="member-chip"><img class="member-chip-avatar" src="${m.avatar||defaultSvg}"><span class="member-chip-name">${m.userName}</span></div>`;
+});
+}
+function clickRoomToManage(roomCode){
+currentSelectedRoomCode=roomCode;document.getElementById("selectedRoomCodeTitle").innerText=roomCode;
+const currentEmpty=roomEmptySettings[roomCode]||"💤";document.getElementById("currentEmptyPlaceholderStatus").innerText=currentEmpty;
+document.getElementById("roomDetailPanel").style.display="block";
+if(socket&&socket.connected){socket.emit('get-room-members',{roomCode:roomCode});}else{renderSelectedRoomMembersOnly([]);}
+}
+function renderSelectedRoomMembersOnly(members){
+const container=document.getElementById("manageMembersContainer");if(!container)return;container.innerHTML="";const myName=document.getElementById("userName").value||"未命名";
+let currentList=[{userName:myName,avatar:userAvatarBase64}];members.forEach(m=>{if(m.userName!==myName)currentList.push(m);});
+currentList.forEach(m=>{
+container.innerHTML+=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;background:#f1f2f6;padding:8px;border-radius:8px;"><img src="${m.avatar||'data:image/svg+xml;utf8,<svg viewBox=\'0 0 24 24\' fill=\'%23a4b0be\'><path d=\'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z\'/></svg>'}" style="width:24px;height:24px;border-radius:50%;object-fit:cover;"><span style="font-size:13px;font-weight:bold;">${m.userName} ${m.userName===myName?'(你)':''}</span></div>`;
+});
+}
+function broadcastCustomEmptyStatus(){
+if(!currentSelectedRoomCode)return;const inputVal=document.getElementById("customEmptyStatusInput").value.trim();if(!inputVal)return alert("請輸入狀態符號文字唷！🎨");
+if(socket&&socket.connected){socket.emit('change-room-empty-status',{roomCode:currentSelectedRoomCode,statusText:inputVal});document.getElementById("customEmptyStatusInput").value="";}else{
+roomEmptySettings[currentSelectedRoomCode]=inputVal;localStorage.setItem("mini2s_roomEmptySettings",JSON.stringify(roomEmptySettings));
+document.getElementById("currentEmptyPlaceholderStatus").innerText=inputVal;updateLivePublishGrid();refreshWatchGridUI();
+}
+}
+function deleteAndExitRoomFromList(){
+if(!currentSelectedRoomCode)return;if(!confirm(`確定要刪除並退出房間 [${currentSelectedRoomCode}] 嗎？`)) return;
+myRoomList=myRoomList.filter(r=>r!==currentSelectedRoomCode);localStorage.setItem("mini2s_myRoomList",JSON.stringify(myRoomList));
+if(socket&&socket.connected){socket.emit('exit-room',{roomCode:currentSelectedRoomCode});}
+document.getElementById("roomDetailPanel").style.display="none";currentSelectedRoomCode="";updateRoomSelectOptions();renderManagementPageUI();updateLivePublishGrid();
+}
+function renderManagementPageUI(){
+const listContainer=document.getElementById("roomListContainer");
+if(listContainer){
+listContainer.innerHTML="";if(myRoomList.length===0){listContainer.innerHTML=`<p style="text-align:center;font-size:13px;color:#a4b0be;">目前沒有任何房間紀錄</p>`;}
+myRoomList.forEach(r=>{
+const currentEmptyStr=roomEmptySettings[r]||"💤";
+listContainer.innerHTML+=`<div class="room-item-row" onclick="clickRoomToManage('${r}')"><span>🏠 房間代碼：${r}</span><span style="font-size:12px;color:#747d8c;background:#fff;padding:4px 8px;border-radius:10px;">預設: ${currentEmptyStr} ➔</span></div>`;
+});
+}
+const uploadsContainer=document.getElementById("myUploadsContainer");
+if(uploadsContainer){
+uploadsContainer.innerHTML="";const dateDB=getActiveDateDB();const myName=document.getElementById("userName").value||"未命名";let hasRecords=false;
+fullDayHours.forEach(h=>{
+if(dateDB[h]){
+myRoomList.forEach(r=>{
+if(dateDB[h][r]&&dateDB[h][r][myName]&&dateDB[h][r][myName].video){
+hasRecords=true;
+uploadsContainer.innerHTML+=`<div class="manage-item-row"><div class="manage-item-info">🚪[${r}] ⏰ ${h} ➔ <span style="color:#747d8c;">"${dateDB[h][r][myName].text}"</span></div><button class="btn-danger-small" onclick="deleteMyDiaryRecord('${h}','${r}')">🗑️ 刪除</button></div>`;
+}
+});
+}
+});
+if(!hasRecords){uploadsContainer.innerHTML=`<p style="font-size:12px;color:#a4b0be;text-align:center;">目前都還沒有發布影片紀錄唷！</p>`;}
+}
+}
+function deleteMyDiaryRecord(hour,roomCode){
+if(!confirm(`確定要刪除房間 [${roomCode}] 在 ${hour} 的紀錄嗎？`))return;
+const date=document.getElementById('diaryDate').value;const myName=document.getElementById("userName").value||"未命名";const dateDB=getActiveDateDB();
+if(dateDB[hour]&&dateDB[hour][roomCode]&&dateDB[hour][roomCode][myName]){
+delete dateDB[hour][roomCode][myName];localStorage.setItem("mini2s_megaDB",JSON.stringify(megaDB));
+if(socket&&socket.connected){socket.emit('share-diary',{roomCode:roomCode,userName:myName,date:date,hour:hour,text:"",avatar:"",video:"",timeStart:0,yAlign:50,region:""});}
+alert("已成功刪除該時段紀錄！");renderManagementPageUI();updateLivePublishGrid();
+}
+}
+function updateLivePublishGrid(){
+const gridContainer=document.getElementById("publishQuadGrid");if(!gridContainer)return;gridContainer.innerHTML="";
+const activeRoom=document.getElementById("activeRoomSelect").value;if(!activeRoom)return;
+const hour=document.getElementById("currentHour").value;const text=document.getElementById("statusText").value||"";const myName=document.getElementById("userName").value||"未命名";
+const reg=document.getElementById("userRegion").value||"🇹🇼 台灣";const dateDB=getActiveDateDB();const userList=GetRoomUserList(hour,activeRoom);const activeRoomEmptyPlaceholder=roomEmptySettings[activeRoom]||"💤";
+for(let i=0;i<4;i++){
+const user=userList[i];const cell=document.createElement("div");cell.className="grid-cell";
+if(user===myName){
+if(currentRawVideoSrc){
+cell.innerHTML=`<div class="cell-overlay-time-box"><div class="cell-time-title">${hour}</div><div class="cell-desc-title">${text}</div></div><div class="cell-profile-badge"><img class="cell-badge-avatar" src="${userAvatarBase64||'data:image/svg+xml;utf8,<svg viewBox=\'0 0 24 24\' fill=\'%23a4b0be\'><path d=\'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z\'/></svg>'}"><span class="cell-badge-name">${myName} ${reg}</span></div><video class="grid-cell-video" id="liveEditVideoRef" loop muted playsinline src="${currentRawVideoSrc}"></video>`;
+}else{
+cell.innerHTML=`<div class="cell-empty-placeholder"><div class="cell-empty-time">${hour}</div><span style="font-size:24px;margin-bottom:5px;">${activeRoomEmptyPlaceholder}</span><span style="font-size:11px;font-weight:bold;">👉 點上方添加影片</span></div>`;
+}
+}else if(user&&dateDB[hour]&&dateDB[hour][activeRoom]&&dateDB[hour][activeRoom][user]&&dateDB[hour][activeRoom][user].text){
+const uData=dateDB[hour][activeRoom][user];
+cell.innerHTML=`<div class="cell-overlay-time-box"><div class="cell-time-title">${hour}</div><div class="cell-desc-title">${uData.text}</div></div><div class="cell-profile-badge"><img class="cell-badge-avatar" src="${uData.avatar||'data:image/svg+xml;utf8,<svg viewBox=\'0 0 24 24\' fill=\'%23a4b0be\'><path d=\'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z\'/></svg>'}"><span class="cell-badge-name">${user} ${uData.region||"🇹🇼 台灣"}</span></div><video class="grid-cell-video" loop autoplay muted playsinline src="${uData.video}" style="object-position:center ${uData.yAlign}%;"></video>`;
+}else{
+cell.innerHTML=`<div class="cell-empty-placeholder"><div class="cell-empty-time">${hour}</div><span style="font-size:24px;">${activeRoomEmptyPlaceholder}</span></div>`;
+}
+gridContainer.appendChild(cell);
+}
+if(currentRawVideoSrc){const editVid=document.getElementById("liveEditVideoRef");if(editVid){editVid.onloadedmetadata=function(){editVid.play();updateVideoCropPreview();}}}
+}
+function prepareVideoEditor(input){
+const file=input.files[0];if(!file)return;
+document.getElementById('timerStatus').innerText="⏳ 載入影片中...";const reader=new FileReader();
+reader.onload=function(e){currentRawVideoSrc=e.target.result;document.getElementById("tweakControlPanel").style.display="block";document.getElementById("timeOffsetSlider").value=0;document.getElementById("vOffsetSlider").value=50;document.getElementById('timerStatus').innerText="✨ 請調整畫面中心！";updateLivePublishGrid();};
+reader.readAsDataURL(file);
+}
+function updateVideoCropPreview(){
+const videoEl=document.getElementById("liveEditVideoRef");if(!videoEl)return;
+const timeStart=parseFloat(document.getElementById("timeOffsetSlider").value);const yAlign=document.getElementById("vOffsetSlider").value;
+document.getElementById("timeVal").innerText=timeStart.toFixed(1)+"s";document.getElementById("yVal").innerText=yAlign+"%";
+if(videoEl.duration){document.getElementById("timeOffsetSlider").max=Math.max(0,videoEl.duration-2);}
+videoEl.currentTime=timeStart;videoEl.style.objectPosition=`center ${yAlign}%`;
+}
+function submitDiaryToServer(){
+const textInput=document.getElementById('statusText').value;if(!textInput||!currentRawVideoSrc)return alert("請填寫狀態並選擇影片唷！🎬");
+const date=document.getElementById('diaryDate').value;const hour=document.getElementById('currentHour').value;const uName=document.getElementById("userName").value||"未命名";
+const activeRoom=document.getElementById("activeRoomSelect").value;const reg=document.getElementById("userRegion").value;
+if(!activeRoom)return alert("你目前沒有在任何房間中！");const dateDB=getActiveDateDB();
+if(!dateDB[hour][activeRoom])dateDB[hour][activeRoom]={};
+dateDB[hour][activeRoom][uName]={text:textInput,avatar:userAvatarBase64,video:currentRawVideoSrc,timeStart:parseFloat(document.getElementById("timeOffsetSlider").value),yAlign:parseInt(document.getElementById("vOffsetSlider").value),region:reg};
+localStorage.setItem("mini2s_megaDB",JSON.stringify(megaDB));
+if(socket&&socket.connected){socket.emit('share-diary',{roomCode:activeRoom,userName:uName,date:date,hour:hour,text:textInput,avatar:userAvatarBase64,video:currentRawVideoSrc,timeStart:dateDB[hour][activeRoom][uName].timeStart,yAlign:dateDB[hour][activeRoom][uName].yAlign,region:reg});}
+alert("生成成功");clearPublishPage();
+}
+function clearPublishPage(){
+document.getElementById('statusText').value="";document.getElementById("tweakControlPanel").style.display="none";document.getElementById('timerStatus').innerText="";
+document.getElementById('cameraVideoInput').value="";document.getElementById('fileVideoInput').value="";currentRawVideoSrc="";updateLivePublishGrid();
+}
+function refreshWatchGridUI(){
+const gridContainer=document.getElementById("watchQuadGrid");if(!gridContainer)return;gridContainer.innerHTML="";
+const watchRoom=document.getElementById("watchRoomSelect").value;if(!watchRoom)return;
+const hour=document.getElementById("watchHourSelect").value;const dateDB=getActiveDateDB();const userList=GetRoomUserList(hour,watchRoom);const activePlaceholder=roomEmptySettings[watchRoom]||"💤";
+for(let i=0;i<4;i++){
+const user=userList[i];const cell=document.createElement("div");cell.className="grid-cell";
+if(user&&dateDB[hour]&&dateDB[hour][watchRoom]&&dateDB[hour][watchRoom][user]&&dateDB[hour][watchRoom][user].text){
+const uData=dateDB[hour][watchRoom][user];
+cell.innerHTML=`<div class="cell-overlay-time-box"><div class="cell-time-title">${hour}</div><div class="cell-desc-title">${uData.text}</div></div><div class="cell-profile-badge"><img class="cell-badge-avatar" src="${uData.avatar||'data:image/svg+xml;utf8,<svg viewBox=\'0 0 24 24\' fill=\'%23a4b0be\'><path d=\'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z\'/></svg>'}"><span class="cell-badge-name">${user} ${uData.region||"🇹🇼 台灣"}</span></div><video class="grid-cell-video" loop autoplay muted playsinline src="${uData.video}" style="object-position:center ${uData.yAlign}%;"></video>`;
+}else{
+cell.innerHTML=`<div class="cell-empty-placeholder"><div class="cell-empty-time">${hour}</div><span style="font-size:24px;">${activePlaceholder}</span></div>`;
+}
+gridContainer.appendChild(cell);
+}
+}
+function saveProfileAndJoin(){
+const uName=document.getElementById("userName").value||"未命名";const reg=document.getElementById("userRegion").value;
+localStorage.setItem("mini2s_userName",uName);localStorage.setItem("mini2s_userRegion",reg);
+if(socket&&socket.connected&&myRoomList.length>0){socket.emit('join-multiple-rooms',{rooms:myRoomList,userName:uName,avatar:userAvatarBase64});}
+}
+function handleDateChange(){
+syncInputText();const activeTabId=document.querySelector('.nav-item.active').id;
+if(activeTabId==="nav2")updateLivePublishGrid();if(activeTabId==="nav3")refreshWatchGridUI();if(activeTabId==="nav5")renderManagementPageUI();
+}
+function syncInputText(){
+const hour=document.getElementById('currentHour').value;const uName=document.getElementById("userName").value||"未命名";const activeRoom=document.getElementById("activeRoomSelect").value;
+const dateDB=getActiveDateDB();document.getElementById('statusText').value=(dateDB[hour]&&dateDB[hour][activeRoom]&&dateDB[hour][activeRoom][uName])?dateDB[hour][activeRoom][uName].text:"";
+}
+function switchTab(tabIndex){
+document.querySelectorAll('.tab-content').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+document.querySelectorAll('.tab-content')[tabIndex].classList.add('active');document.querySelectorAll('.nav-item')[tabIndex].classList.add('active');
+if(tabIndex===1)handleActiveRoomToggle();if(tabIndex===2)refreshWatchGridUI();if(tabIndex===4)renderManagementPageUI();
+}
+async function renderMegaFullDayVideo(){
+const canvas=document.getElementById('canvasStage');const ctx=canvas.getContext('2d');const outputArea=document.getElementById('megaOutputArea');const dateDB=getActiveDateDB();
+const myCurrentName=document.getElementById("userName").value||"未命名";const rCode=document.getElementById("renderRoomSelect").value;
+if(!rCode)return alert("請選擇房間！");const activePlaceholder=roomEmptySettings[rCode]||"💤";
+let activeHours=Object.keys(dateDB).filter(h=>dateDB[h][rCode]&&Object.keys(dateDB[h][rCode]).some(u=>dateDB[h][rCode][u]&&dateDB[h][rCode][u].video)).sort();
+if(activeHours.length===0){outputArea.innerHTML="<p style='color:#2f3542;font-weight:bold;'>❌ 今天沒有影片紀錄</p>";return;}
+outputArea.innerHTML=`<p style='color:#747d8c;font-weight:bold;'>生成中...</p>`;
+const stream=canvas.captureStream(24);const recorder=new MediaRecorder(stream,{mimeType:'video/webm'});let chunks=[];recorder.ondataavailable=(e)=>chunks.push(e.data);
+recorder.onstop=()=>{
+const blob=new Blob(chunks,{type:'video/mp4'});const url=URL.createObjectURL(blob);
+outputArea.innerHTML=`<p style="color:#2ed573;font-weight:bold;">🎉 生成成功！</p><video src="${url}" controls autoplay style="width:100%;max-width:320px;border-radius:12px;margin-top:10px;"></video><a href="${url}" download="Diary_Room_${rCode}.mp4" style="color:#2f3542;text-decoration:none;font-weight:bold;display:block;margin-top:8px;">📥 下載 MP4</a>`;
+};
+recorder.start();
+const userSet=new Set([myCurrentName]);activeHours.forEach(h=>{if(dateDB[h][rCode])Object.keys(dateDB[h][rCode]).forEach(u=>userSet.add(u));});const userList=Array.from(userSet).slice(0,4);
+const loadedAvatars={};
+for(let u of userList){
+let src="data:image/svg+xml;utf8,<svg viewBox='0 0 24 24' fill='%23a4b0be'><path d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z'/></svg>";
+for(let h of activeHours){if(dateDB[h]&&dateDB[h][rCode]&&dateDB[h][rCode][u]&&dateDB[h][rCode][u].avatar){src=dateDB[h][rCode][u].avatar;break;}}
+const img=new Image();img.src=src;await new Promise(r=>img.onload=r);loadedAvatars[u]=img;
+}
+const cellW=canvas.width/2;const cellH=canvas.height/2;const gridCoords=[{x:0,y:0},{x:cellW,y:0},{x:0,y:cellH},{x:cellW,y:cellH}];
+for(let h of activeHours){
+const vElements={};
+for(let u of userList){
+if(dateDB[h]&&dateDB[h][rCode]&&dateDB[h][rCode][u]&&dateDB[h][rCode][u].video){
+const v=document.createElement('video');v.src=dateDB[h][rCode][u].video;v.muted=true;v.playsInline=true;v.currentTime=dateDB[h][rCode][u].timeStart||0;v.play();vElements[u]=v;
+}
+}
+let startRun=Date.now();
+while(Date.now()-startRun<2000){
+ctx.fillStyle='#1e1e1e';ctx.fillRect(0,0,canvas.width,canvas.height);
+for(let i=0;i<4;i++){
+const u=userList[i];if(!u)continue;const coord=gridCoords[i];const uData=(dateDB[h]&&dateDB[h][rCode])?dateDB[h][rCode][u]:null;
+ctx.save();ctx.beginPath();ctx.rect(coord.x,coord.y,cellW,cellH);ctx.clip();
+if(uData&&uData.video&&vElements[u]&&vElements[u].videoWidth > 0){
+const video=vElements[u];let scale=Math.max(cellW/video.videoWidth,cellH/video.videoHeight);
+let drawW=video.videoWidth*scale;let drawH=video.videoHeight*scale;let drawX=coord.x+(cellW-drawW)/2;let drawY=coord.y+(cellH-drawH)*((uData.yAlign||50)/100);
+ctx.drawImage(video,drawX,drawY,drawW,drawH);ctx.fillStyle="rgba(0,0,0,0.12)";ctx.fillRect(coord.x,coord.y,cellW,cellH);
+ctx.fillStyle="#ffffff";ctx.textAlign="center";ctx.shadowColor="rgba(0,0,0,0.6)";ctx.shadowBlur=8;ctx.font="800 32px 'Lexend',sans-serif";ctx.fillText(h,coord.x+cellW/2,coord.y+(cellH/2)-10);
+ctx.font="bold 20px sans-serif";ctx.fillText(uData.text,coord.x+cellW/2,coord.y+(cellH/2)+30);ctx.shadowBlur=0;
+const regionDisplay=uData.region||"";const bx=coord.x+12;const by=coord.y+12;
+ctx.fillStyle="rgba(0,0,0,0.3)";ctx.beginPath();ctx.roundRect(bx,by,125,26,13);ctx.fill();
+if(loadedAvatars[u]){ctx.save();ctx.beginPath();ctx.arc(bx+13,by+13,9,0,Math.PI*2);ctx.clip();ctx.drawImage(loadedAvatars[u],bx+4,by+4,18,18);ctx.restore();}
+ctx.fillStyle="#ffffff";ctx.textAlign="left";ctx.font="bold 11px sans-serif";ctx.fillText(`${u} ${regionDisplay.substring(0,6)}`,bx+28,by+17);
+}else{
+ctx.fillStyle='#121212';ctx.fillRect(coord.x,coord.y,cellW,cellH);ctx.fillStyle='rgba(255,255,255,0.2)';ctx.textAlign="center";
+ctx.font="800 30px 'Lexend',sans-serif";ctx.fillText(h,coord.x+cellW/2,coord.y+(cellH/2)-15);ctx.font="30px sans-serif";ctx.fillText(activePlaceholder,coord.x+cellW/2,coord.y+(cellH/2)+25);
+}
+ctx.restore();
+}
+await new Promise(r=>setTimeout(r,40));
+}
+for(let u in vElements){vElements[u].pause();vElements[u].src="";vElements[u].load();}
+}
+recorder.stop();
+}
+</script>
+    </body>
 </html>
-        
 </body>
 </html>
