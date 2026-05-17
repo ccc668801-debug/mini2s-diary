@@ -75,11 +75,8 @@
         .grid-cell-video { width: 100%; height: 100%; object-fit: cover; }
         
         .cell-overlay-time-box {
-            position: absolute;
-            top: 50%; left: 50%;
-            transform: translate(-50%, -50%);
-            width: 100%; text-align: center; color: #ffffff;
-            text-shadow: 0 2px 8px rgba(0,0,0,0.85); z-index: 10; pointer-events: none;
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 100%; text-align: center; color: #ffffff; text-shadow: 0 2px 8px rgba(0,0,0,0.85); z-index: 10; pointer-events: none;
         }
         .cell-time-title { font-family: 'Lexend', sans-serif; font-size: 20px; font-weight: 800; margin: 0; }
         .cell-desc-title { font-size: 15px; font-weight: 700; margin-top: 4px; padding: 0 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -101,7 +98,16 @@
         .range-control-group { background: rgba(255,255,255,0.1); padding: 8px; border-radius: 8px; margin-bottom: 8px; }
         .range-slider { width: 100%; margin: 4px 0; accent-color: #ff7675; }
 
-        /* 房間管理條目樣式 */
+        /* 💥 新增：房間清單與展開面板樣式 */
+        .room-item-row {
+            background: #f1f2f6; padding: 15px; margin-bottom: 10px; border-radius: 14px; cursor: pointer;
+            font-weight: bold; display: flex; justify-content: space-between; align-items: center;
+        }
+        .room-item-row:hover { background: #e4e7eb; }
+        .room-detail-panel {
+            display: none; background: #ffffff; border: 2px solid #f1f2f6; padding: 15px; margin-bottom: 15px; border-radius: 14px;
+        }
+
         .manage-item-row {
             display: flex; justify-content: space-between; align-items: center; 
             padding: 10px; background: #f1f2f6; margin-bottom: 8px; border-radius: 12px;
@@ -160,15 +166,18 @@
             <label>📍 目前所在地區：</label>
             <input type="text" id="userRegion" value="🇹🇼 台灣" placeholder="可自由修改地區或 Emoji" onchange="saveProfileAndJoin(); updateLivePublishGrid();">
 
-            <label>房間代碼：</label>
-            <input type="text" id="roomCode" value="ABC99" onchange="saveProfileAndJoin()">
-            <button onclick="switchTab(1)">進入房間 ➔</button>
+            <label>輸入想進入/新增的房間代碼：</label>
+            <input type="text" id="roomCode" value="123" placeholder="例如: 123">
+            <button onclick="addNewRoomCodeAction()">進入該房間 ➔</button>
         </div>
     </div>
 
     <div id="page2" class="tab-content">
         <div class="card">
-            <h3>🕒 當地時段發布</h3>
+            <h3>🕒 當地時段發布 (目前房號: <span id="currentPublishRoomTitle" style="color:#ff7675;">-</span>)</h3>
+            <label>當前操作房號切換：</label>
+            <select id="activeRoomSelect" onchange="handleActiveRoomToggle()"></select>
+
             <label>當地時間：</label>
             <select id="currentHour" onchange="syncInputText(); updateLivePublishGrid();">
                 <script>
@@ -212,6 +221,9 @@
     <div id="page3" class="tab-content">
         <div class="card">
             <h3>看看大家在幹嘛</h3>
+            <label>選擇觀看房間：</label>
+            <select id="watchRoomSelect" onchange="refreshWatchGridUI()"></select>
+
             <label>選擇觀看時段：</label>
             <select id="watchHourSelect" onchange="refreshWatchGridUI()">
                 <script>
@@ -229,7 +241,9 @@
     <div id="page4" class="tab-content">
         <div class="card">
             <h3>全天 24 小時</h3>
-            <button onclick="renderMegaFullDayVideo()" style="background: #2ed573; color: white; padding: 15px; font-size: 16px; margin-top: 10px;">一鍵生成 24H</button>
+            <label>選擇要生成大片的房間：</label>
+            <select id="renderRoomSelect" style="margin-bottom:15px;"></select>
+            <button onclick="renderMegaFullDayVideo()" style="background: #2ed573; color: white; padding: 15px; font-size: 16px;">一鍵生成 24H</button>
             <div id="megaOutputArea" style="margin-top: 20px; text-align: center;"></div>
         </div>
         <canvas id="canvasStage" width="540" height="960"></canvas>
@@ -237,26 +251,31 @@
 
     <div id="page5" class="tab-content">
         <div class="card">
-            <h3>🏠 房間內部管理</h3>
-            <p style="font-size: 13px; color:#747d8c; text-align:center;">目前所在的房間：<strong id="manageRoomCodeDisplay" style="color:#2f3542;">-</strong></p>
+            <h3>🏠 房間清單管理</h3>
+            <p style="font-size:12px; color:#747d8c; text-align:center; margin-bottom:15px;">👇 點擊下方房間列表，即可修改未上傳狀態或退出該房間</p>
             
-            <div style="background: #f1f2f6; padding: 12px; margin-bottom: 15px; border-radius: 12px; border: 1px dashed #747d8c;">
-                <label style="margin-top:0; color:#2f3542;">🎨 更改全房「未上傳狀態」文字：</label>
-                <div style="font-size: 11px; color:#747d8c; margin-bottom: 6px;">目前房間預設顯示：<strong id="currentEmptyPlaceholderStatus" style="color:#ff7675; font-size:13px;">💤</strong></div>
-                <div style="display:flex; gap:8px;">
-                    <input type="text" id="customEmptyStatusInput" placeholder="例如: Zzz、👀、休息中" style="margin-bottom:0; padding:8px;">
-                    <button onclick="broadcastCustomEmptyStatus()" style="width:auto; padding:0 15px; background:#747d8c;">更換</button>
+            <div id="roomListContainer"></div>
+
+            <div id="roomDetailPanel" class="room-detail-panel">
+                <h4 style="margin-top:0; color:#2f3542; border-bottom:2px solid #f1f2f6; padding-bottom:8px;">🚪 房間 [<span id="selectedRoomCodeTitle"></span>] 管理面板</h4>
+                
+                <div style="background: #f1f2f6; padding: 12px; margin-bottom: 15px; border-radius: 12px;">
+                    <label style="margin-top:0; color:#2f3542;">🎨 更改此房「未上傳狀態」文字：</label>
+                    <div style="font-size: 11px; color:#747d8c; margin-bottom: 6px;">目前顯示預設：<strong id="currentEmptyPlaceholderStatus" style="color:#ff7675; font-size:13px;">💤</strong></div>
+                    <div style="display:flex; gap:8px;">
+                        <input type="text" id="customEmptyStatusInput" placeholder="例如: Zzz, 👀, 偷懶中" style="margin-bottom:0; padding:8px;">
+                        <button onclick="broadcastCustomEmptyStatus()" style="width:auto; padding:0 15px; background:#747d8c;">更換</button>
+                    </div>
                 </div>
+
+                <label>👥 房內在線成員：</label>
+                <div id="manageMembersContainer" style="margin-bottom: 15px;"></div>
+
+                <button onclick="deleteAndExitRoomFromList()" style="background:#ff7675; margin-bottom: 10px;">🗑️ 刪除並退出此房間</button>
             </div>
 
-            <label>👥 房內在線成員名單：</label>
-            <div id="manageMembersContainer" style="margin-bottom: 15px;"></div>
-
-            <button onclick="exitCurrentRoom()" style="background:#ff7675; margin-bottom: 25px;">🚪 退出房間</button>
-            
-            <hr style="border:0; border-top:1px solid #e4e7eb; margin-bottom:15px;">
-
-            <label>📸 我今天已發布的時段紀錄：</label>
+            <hr style="border:0; border-top:1px solid #e4e7eb; margin-top:20px; margin-bottom:15px;">
+            <label>📸 我今天已發布的時段紀錄 (全部房間)：</label>
             <div id="myUploadsContainer"></div>
         </div>
     </div>
@@ -271,39 +290,58 @@
 
     <script>
         let socket; let userAvatarBase64 = ""; let currentRawVideoSrc = ""; let megaDB = {};
-        let globalCachedMembers = []; 
-        let globalEmptyPlaceholder = "💤"; // 💥 全域未上傳預設文字變數
+        let myRoomList = ["123"]; // 💥 紀錄我加入過的所有房間列表
+        let roomEmptySettings = {}; // 💥 各房間專屬的未上傳符號對照表 { roomCode: "💤" }
+        let currentSelectedRoomCode = ""; // 目前在管理頁面點擊選中的房號
+        let globalCachedMembers = [];
         const fullDayHours = []; for(let i=0; i<24; i++) { fullDayHours.push((i < 10 ? '0' + i : i) + ':00'); }
 
         window.onload = function() {
             const today = new Date();
             document.getElementById('diaryDate').value = today.toISOString().split('T')[0];
 
+            if(localStorage.getItem("mini2s_myRoomList")) {
+                myRoomList = JSON.parse(localStorage.getItem("mini2s_myRoomList"));
+            }
+            if(localStorage.getItem("mini2s_roomEmptySettings")) {
+                roomEmptySettings = JSON.parse(localStorage.getItem("mini2s_roomEmptySettings"));
+            }
+
             socket = io();
             socket.on('connect', () => { saveProfileAndJoin(); });
 
-            socket.on('room-members-update', (members) => {
-                globalCachedMembers = members;
-                renderRoomMembersUI(members);
-                renderManagementPageUI();
+            socket.on('room-members-update', (data) => {
+                // 收到多房間格式的成員名單
+                globalCachedMembers = data.members || [];
+                const activeRoom = document.getElementById("activeRoomSelect").value;
+                if(data.roomCode === activeRoom) {
+                    renderRoomMembersUI(globalCachedMembers);
+                }
+                if(currentSelectedRoomCode === data.roomCode) {
+                    renderSelectedRoomMembersOnly(globalCachedMembers);
+                }
             });
 
-            // 💥 監聽伺服器廣播來的全房未上傳狀態同步
-            socket.on('update-room-empty-status', (newStatus) => {
-                if(newStatus) {
-                    globalEmptyPlaceholder = newStatus;
-                    document.getElementById("currentEmptyPlaceholderStatus").innerText = newStatus;
+            socket.on('update-room-empty-status', (data) => {
+                if(data && data.roomCode) {
+                    roomEmptySettings[data.roomCode] = data.statusText;
+                    localStorage.setItem("mini2s_roomEmptySettings", JSON.stringify(roomEmptySettings));
+                    
+                    if(data.roomCode === currentSelectedRoomCode) {
+                        document.getElementById("currentEmptyPlaceholderStatus").innerText = data.statusText;
+                    }
                     updateLivePublishGrid();
                     refreshWatchGridUI();
                 }
             });
 
             socket.on('new-diary-broadcast', (data) => {
-                const d = data.date; const h = data.hour; const u = data.userName;
+                const d = data.date; const h = data.hour; const u = data.userName; const r = data.roomCode;
                 if (!megaDB[d]) megaDB[d] = initDateHours();
                 if (!megaDB[d][h]) megaDB[d][h] = {};
+                if (!megaDB[d][h][r]) megaDB[d][h][r] = {};
 
-                megaDB[d][h][u] = {
+                megaDB[d][h][r][u] = {
                     text: data.text, avatar: data.avatar, video: data.video,
                     timeStart: data.timeStart || 0, yAlign: data.yAlign || 50, region: data.region || "🇹🇼 台灣"
                 };
@@ -316,7 +354,6 @@
             });
 
             if(localStorage.getItem("mini2s_userName")) document.getElementById("userName").value = localStorage.getItem("mini2s_userName");
-            if(localStorage.getItem("mini2s_roomCode")) document.getElementById("roomCode").value = localStorage.getItem("mini2s_roomCode");
             if(localStorage.getItem("mini2s_userRegion")) document.getElementById("userRegion").value = localStorage.getItem("mini2s_userRegion");
             if(localStorage.getItem("mini2s_customAvatar")) {
                 userAvatarBase64 = localStorage.getItem("mini2s_customAvatar");
@@ -324,6 +361,7 @@
             }
             megaDB = localStorage.getItem("mini2s_megaDB") ? JSON.parse(localStorage.getItem("mini2s_megaDB")) : {};
             
+            updateRoomSelectOptions();
             saveProfileAndJoin();
             updateLivePublishGrid();
             syncInputText();
@@ -346,39 +384,62 @@
 
         function getActiveDateDB() { const date = document.getElementById('diaryDate').value; if(!megaDB[date]) megaDB[date] = initDateHours(); return megaDB[date]; }
         
-        function GetRoomUserList(hour) {
+        function GetRoomUserList(hour, roomCode) {
             const dateDB = getActiveDateDB();
             const myName = document.getElementById("userName").value || "未命名";
             const userSet = new Set([myName]);
-            if(dateDB[hour]) { Object.keys(dateDB[hour]).forEach(u => userSet.add(u)); }
+            if(dateDB[hour] && dateDB[hour][roomCode]) { 
+                Object.keys(dateDB[hour][roomCode]).forEach(u => userSet.add(u)); 
+            }
             return Array.from(userSet).slice(0, 4);
         }
 
-        function renderRoomMembersUI(serverMembers) {
-            const bar = document.getElementById("roomMembersList");
-            if(!bar) return;
-            bar.innerHTML = "";
-            
-            const myName = document.getElementById("userName").value || "未命名";
-            let listToShow = [];
-            
-            if (serverMembers && serverMembers.length > 0) {
-                let hasMe = serverMembers.some(m => m.userName === myName);
-                if (!hasMe) {
-                    listToShow.push({ userName: myName, avatar: userAvatarBase64 });
-                }
-                serverMembers.forEach(m => listToShow.push(m));
-            } else {
-                listToShow.push({ userName: myName, avatar: userAvatarBase64 });
+        // 💥 新增房間代碼動作
+        function addNewRoomCodeAction() {
+            const code = document.getElementById("roomCode").value.trim();
+            if(!code) return alert("請輸入房間代碼！");
+            if(!myRoomList.includes(code)) {
+                myRoomList.push(code);
+                localStorage.setItem("mini2s_myRoomList", JSON.stringify(myRoomList));
             }
+            updateRoomSelectOptions();
+            document.getElementById("activeRoomSelect").value = code;
+            handleActiveRoomToggle();
+            saveProfileAndJoin();
+            switchTab(1);
+        }
 
-            const uniqueList = [];
-            const seen = new Set();
-            listToShow.forEach(item => {
-                if (!seen.has(item.userName)) {
-                    seen.add(item.userName);
-                    uniqueList.push(item);
-                }
+        function updateRoomSelectOptions() {
+            const s2 = document.getElementById("activeRoomSelect");
+            const s3 = document.getElementById("watchRoomSelect");
+            const s4 = document.getElementById("renderRoomSelect");
+            
+            let html = "";
+            myRoomList.forEach(r => { html += `<option value="${r}">${r}</option>`; });
+            
+            if(s2) s2.innerHTML = html;
+            if(s3) s3.innerHTML = html;
+            if(s4) s4.innerHTML = html;
+        }
+
+        function handleActiveRoomToggle() {
+            const activeRoom = document.getElementById("activeRoomSelect").value;
+            document.getElementById("currentPublishRoomTitle").innerText = activeRoom;
+            updateLivePublishGrid();
+            syncInputText();
+            if(socket && socket.connected) {
+                socket.emit('get-room-members', { roomCode: activeRoom });
+            }
+        }
+
+        function renderRoomMembersUI(members) {
+            const bar = document.getElementById("roomMembersList");
+            if(!bar) return; bar.innerHTML = "";
+            const myName = document.getElementById("userName").value || "未命名";
+            
+            let uniqueList = [{ userName: myName, avatar: userAvatarBase64 }];
+            members.forEach(m => {
+                if(m.userName !== myName) uniqueList.push(m);
             });
 
             uniqueList.slice(0, 4).forEach(m => {
@@ -392,46 +453,96 @@
             });
         }
 
-        // 💥 按下「更換」時，將客製化未上傳符號/文字發送到伺服器
-        function broadcastCustomEmptyStatus() {
-            const inputVal = document.getElementById("customEmptyStatusInput").value.trim();
-            if(!inputVal) return alert("請輸入想要變更的未上傳文字或表情符號唷！🎨");
-            const rCode = document.getElementById("roomCode").value;
+        // 💥 核心功能：點擊清單中的房間展開管理
+        function clickRoomToManage(roomCode) {
+            currentSelectedRoomCode = roomCode;
+            document.getElementById("selectedRoomCodeTitle").innerText = roomCode;
             
-            // 透過 Socket.io 發出特定自訂狀態更新事件
+            const currentEmpty = roomEmptySettings[roomCode] || "💤";
+            document.getElementById("currentEmptyPlaceholderStatus").innerText = currentEmpty;
+            
+            document.getElementById("roomDetailPanel").style.display = "block";
+            
             if(socket && socket.connected) {
-                socket.emit('change-room-empty-status', { roomCode: rCode, statusText: inputVal });
+                socket.emit('get-room-members', { roomCode: roomCode });
+            } else {
+                renderSelectedRoomMembersOnly([]);
+            }
+        }
+
+        function renderSelectedRoomMembersOnly(members) {
+            const container = document.getElementById("manageMembersContainer");
+            if(!container) return; container.innerHTML = "";
+            const myName = document.getElementById("userName").value || "未命名";
+            
+            let currentList = [{ userName: myName, avatar: userAvatarBase64 }];
+            members.forEach(m => { if(m.userName !== myName) currentList.push(m); });
+
+            currentList.forEach(m => {
+                container.innerHTML += `
+                    <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px; background:#f1f2f6; padding:8px; border-radius:8px;">
+                        <img src="${m.avatar || 'data:image/svg+xml;utf8,<svg viewBox=\'0 0 24 24\' fill=\'%23a4b0be\'><path d=\'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z\'/></svg>'}" style="width:24px; height:24px; border-radius:50%; object-fit:cover;">
+                        <span style="font-size:13px; font-weight:bold;">${m.userName} ${m.userName === myName ? '(你)' : ''}</span>
+                    </div>
+                `;
+            });
+        }
+
+        function broadcastCustomEmptyStatus() {
+            if(!currentSelectedRoomCode) return;
+            const inputVal = document.getElementById("customEmptyStatusInput").value.trim();
+            if(!inputVal) return alert("請輸入狀態符號文字唷！🎨");
+            
+            if(socket && socket.connected) {
+                socket.emit('change-room-empty-status', { roomCode: currentSelectedRoomCode, statusText: inputVal });
                 document.getElementById("customEmptyStatusInput").value = "";
             } else {
-                // 單機備用fallback
-                globalEmptyPlaceholder = inputVal;
+                roomEmptySettings[currentSelectedRoomCode] = inputVal;
+                localStorage.setItem("mini2s_roomEmptySettings", JSON.stringify(roomEmptySettings));
                 document.getElementById("currentEmptyPlaceholderStatus").innerText = inputVal;
                 updateLivePublishGrid();
                 refreshWatchGridUI();
             }
         }
 
-        function renderManagementPageUI() {
-            const rCode = document.getElementById("roomCode").value;
-            document.getElementById("manageRoomCodeDisplay").innerText = rCode;
-            document.getElementById("currentEmptyPlaceholderStatus").innerText = globalEmptyPlaceholder;
+        function deleteAndExitRoomFromList() {
+            if(!currentSelectedRoomCode) return;
+            if(!confirm(`確定要刪除並退出房間 [${currentSelectedRoomCode}] 嗎？`)) return;
+            
+            myRoomList = myRoomList.filter(r => r !== currentSelectedRoomCode);
+            localStorage.setItem("mini2s_myRoomList", JSON.stringify(myRoomList));
+            
+            if(socket && socket.connected) {
+                socket.emit('exit-room', { roomCode: currentSelectedRoomCode });
+            }
+            
+            document.getElementById("roomDetailPanel").style.display = "none";
+            currentSelectedRoomCode = "";
+            updateRoomSelectOptions();
+            renderManagementPageUI();
+            updateLivePublishGrid();
+        }
 
-            const membersContainer = document.getElementById("manageMembersContainer");
-            if(membersContainer) {
-                membersContainer.innerHTML = "";
-                const myName = document.getElementById("userName").value || "未命名";
-                let currentList = globalCachedMembers.length > 0 ? globalCachedMembers : [{ userName: myName, avatar: userAvatarBase64 }];
-                
-                currentList.forEach(m => {
-                    membersContainer.innerHTML += `
-                        <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px; background:#fff; padding:8px; border:1px solid #e4e7eb;">
-                            <img src="${m.avatar || 'data:image/svg+xml;utf8,<svg viewBox=\'0 0 24 24\' fill=\'%23a4b0be\'><path d=\'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z\'/></svg>'}" style="width:24px; height:24px; border-radius:50%; object-fit:cover;">
-                            <span style="font-size:13px; font-weight:bold;">${m.userName} ${m.userName === myName ? '(你)' : ''}</span>
+        function renderManagementPageUI() {
+            const listContainer = document.getElementById("roomListContainer");
+            if(listContainer) {
+                listContainer.innerHTML = "";
+                if(myRoomList.length === 0) {
+                    listContainer.innerHTML = `<p style="text-align:center;font-size:13px;color:#a4b0be;">目前沒有任何房間紀錄，請前往設定頁加入！</p>`;
+                }
+                // 💥 核心需求：一行一行顯示房間
+                myRoomList.forEach(r => {
+                    const currentEmptyStr = roomEmptySettings[r] || "💤";
+                    listContainer.innerHTML += `
+                        <div class="room-item-row" onclick="clickRoomToManage('${r}')">
+                            <span>🏠 房間代碼：${r}</span>
+                            <span style="font-size:12px; color:#747d8c; background:#fff; padding:4px 8px; border-radius:10px;">預設: ${currentEmptyStr} ➔</span>
                         </div>
                     `;
                 });
             }
 
+            // 顯示我的今日上傳列表
             const uploadsContainer = document.getElementById("myUploadsContainer");
             if(uploadsContainer) {
                 uploadsContainer.innerHTML = "";
@@ -440,68 +551,63 @@
                 let hasRecords = false;
 
                 fullDayHours.forEach(h => {
-                    if(dateDB[h] && dateDB[h][myName] && dateDB[h][myName].video) {
-                        hasRecords = true;
-                        uploadsContainer.innerHTML += `
-                            <div class="manage-item-row">
-                                <div class="manage-item-info">⏰ 時段 ${h} ➔ <span style="color:#747d8c;">"${dateDB[h][myName].text}"</span></div>
-                                <button class="btn-danger-small" onclick="deleteMyDiaryRecord('${h}')">🗑️ 刪除紀錄</button>
-                            </div>
-                        `;
+                    if(dateDB[h]) {
+                        myRoomList.forEach(r => {
+                            if(dateDB[h][r] && dateDB[h][r][myName] && dateDB[h][r][myName].video) {
+                                hasRecords = true;
+                                uploadsContainer.innerHTML += `
+                                    <div class="manage-item-row">
+                                        <div class="manage-item-info">🚪[${r}] ⏰ ${h} ➔ <span style="color:#747d8c;">"${dateDB[h][r][myName].text}"</span></div>
+                                        <button class="btn-danger-small" onclick="deleteMyDiaryRecord('${h}', '${r}')">🗑️ 刪除</button>
+                                    </div>
+                                ];
+                            }
+                        });
                     }
                 });
 
                 if(!hasRecords) {
-                    uploadsContainer.innerHTML = `<p style="font-size:12px; color:#a4b0be; text-align:center;">目前這個日期你還沒有發布任何日常動態唷！${globalEmptyPlaceholder}</p>`;
+                    uploadsContainer.innerHTML = `<p style="font-size:12px; color:#a4b0be; text-align:center;">目前所有房間都還沒有發布日常影片唷！</p>`;
                 }
             }
         }
 
-        function deleteMyDiaryRecord(hour) {
-            if(!confirm(`確定要刪除 ${hour} 時段的動態影片嗎？`)) return;
+        function deleteMyDiaryRecord(hour, roomCode) {
+            if(!confirm(`確定要刪除房間 [${roomCode}] 在 ${hour} 的紀錄嗎？`)) return;
             const date = document.getElementById('diaryDate').value;
             const myName = document.getElementById("userName").value || "未命名";
             const dateDB = getActiveDateDB();
 
-            if(dateDB[hour] && dateDB[hour][myName]) {
-                delete dateDB[hour][myName];
+            if(dateDB[hour] && dateDB[hour][roomCode] && dateDB[hour][roomCode][myName]) {
+                delete dateDB[hour][roomCode][myName];
                 localStorage.setItem("mini2s_megaDB", JSON.stringify(megaDB));
                 
                 if(socket && socket.connected) {
-                    const rCode = document.getElementById("roomCode").value;
                     socket.emit('share-diary', {
-                        roomCode: rCode, userName: myName, date: date, hour: hour,
+                        roomCode: roomCode, userName: myName, date: date, hour: hour,
                         text: "", avatar: "", video: "", timeStart: 0, yAlign: 50, region: ""
                     });
                 }
-                alert("已成功刪除該時段影片！");
+                alert("已成功刪除該時段紀錄！");
                 renderManagementPageUI();
                 updateLivePublishGrid();
             }
         }
 
-        function exitCurrentRoom() {
-            if(!confirm("確定要退出目前房間嗎？")) return;
-            document.getElementById("roomCode").value = "";
-            localStorage.setItem("mini2s_roomCode", "");
-            if(socket && socket.connected) {
-                socket.emit('join-room-with-profile', { roomCode: "", userName: "", avatar: "" });
-            }
-            alert("已退出房間");
-            switchTab(0);
-        }
-
         function updateLivePublishGrid() {
             const gridContainer = document.getElementById("publishQuadGrid");
-            if(!gridContainer) return;
-            gridContainer.innerHTML = "";
+            if(!gridContainer) return; gridContainer.innerHTML = "";
+
+            const activeRoom = document.getElementById("activeRoomSelect").value;
+            if(!activeRoom) return;
 
             const hour = document.getElementById("currentHour").value;
             const text = document.getElementById("statusText").value || "";
             const myName = document.getElementById("userName").value || "未命名";
             const reg = document.getElementById("userRegion").value || "🇹🇼 台灣";
             const dateDB = getActiveDateDB();
-            const userList = GetRoomUserList(hour);
+            const userList = GetRoomUserList(hour, activeRoom);
+            const activeRoomEmptyPlaceholder = roomEmptySettings[activeRoom] || "💤";
 
             for(let i=0; i<4; i++) {
                 const user = userList[i];
@@ -522,17 +628,16 @@
                             <video class="grid-cell-video" id="liveEditVideoRef" loop muted playsinline src="${currentRawVideoSrc}"></video>
                         `;
                     } else {
-                        // 💥 帶入連線同步後的預設符號變數
                         cell.innerHTML = `
                             <div class="cell-empty-placeholder">
                                 <div class="cell-empty-time">${hour}</div>
-                                <span style="font-size:24px; margin-bottom:5px;">${globalEmptyPlaceholder}</span>
+                                <span style="font-size:24px; margin-bottom:5px;">${activeRoomEmptyPlaceholder}</span>
                                 <span style="font-size:11px; font-weight:bold;">👉 點上方添加影片</span>
                             </div>
                         `;
                     }
-                } else if(user && dateDB[hour] && dateDB[hour][user] && dateDB[hour][user].text) {
-                    const uData = dateDB[hour][user];
+                } else if(user && dateDB[hour] && dateDB[hour][activeRoom] && dateDB[hour][activeRoom][user] && dateDB[hour][activeRoom][user].text) {
+                    const uData = dateDB[hour][activeRoom][user];
                     cell.innerHTML = `
                         <div class="cell-overlay-time-box">
                             <div class="cell-time-title">${hour}</div>
@@ -545,11 +650,10 @@
                         <video class="grid-cell-video" loop autoplay muted playsinline src="${uData.video}" style="object-position: center ${uData.yAlign}%;"></video>
                     `;
                 } else {
-                    // 💥 帶入連線同步後的預設符號變數
                     cell.innerHTML = `
                         <div class="cell-empty-placeholder">
                             <div class="cell-empty-time">${hour}</div>
-                            <span style="font-size:24px;">${globalEmptyPlaceholder}</span>
+                            <span style="font-size:24px;">${activeRoomEmptyPlaceholder}</span>
                         </div>
                     `;
                 }
@@ -559,10 +663,7 @@
             if(currentRawVideoSrc) {
                 const editVid = document.getElementById("liveEditVideoRef");
                 if(editVid) {
-                    editVid.onloadedmetadata = function() {
-                        editVid.play();
-                        updateVideoCropPreview();
-                    }
+                    editVid.onloadedmetadata = function() { editVid.play(); updateVideoCropPreview(); }
                 }
             }
         }
@@ -583,13 +684,11 @@
         }
 
         function updateVideoCropPreview() {
-            const videoEl = document.getElementById("liveEditVideoRef");
-            if(!videoEl) return;
+            const videoEl = document.getElementById("liveEditVideoRef"); if(!videoEl) return;
             const timeStart = parseFloat(document.getElementById("timeOffsetSlider").value);
             const yAlign = document.getElementById("vOffsetSlider").value;
             document.getElementById("timeVal").innerText = timeStart.toFixed(1) + "s";
             document.getElementById("yVal").innerText = yAlign + "%";
-            
             if(videoEl.duration) { document.getElementById("timeOffsetSlider").max = Math.max(0, videoEl.duration - 2); }
             videoEl.currentTime = timeStart;
             videoEl.style.objectPosition = `center ${yAlign}%`;
@@ -602,11 +701,14 @@
             const date = document.getElementById('diaryDate').value;
             const hour = document.getElementById('currentHour').value;
             const uName = document.getElementById("userName").value || "未命名";
-            const rCode = document.getElementById("roomCode").value;
+            const activeRoom = document.getElementById("activeRoomSelect").value;
             const reg = document.getElementById("userRegion").value;
+            
+            if(!activeRoom) return alert("你目前沒有在任何房間中！");
             const dateDB = getActiveDateDB();
 
-            dateDB[hour][uName] = {
+            if(!dateDB[hour][activeRoom]) dateDB[hour][activeRoom] = {};
+            dateDB[hour][activeRoom][uName] = {
                 text: textInput, avatar: userAvatarBase64, video: currentRawVideoSrc,
                 timeStart: parseFloat(document.getElementById("timeOffsetSlider").value),
                 yAlign: parseInt(document.getElementById("vOffsetSlider").value),
@@ -616,9 +718,9 @@
 
             if(socket && socket.connected) {
                 socket.emit('share-diary', {
-                    roomCode: rCode, userName: uName, date: date, hour: hour,
+                    roomCode: activeRoom, userName: uName, date: date, hour: hour,
                     text: textInput, avatar: userAvatarBase64, video: currentRawVideoSrc,
-                    timeStart: dateDB[hour][uName].timeStart, yAlign: dateDB[hour][uName].yAlign, region: reg
+                    timeStart: dateDB[hour][activeRoom][uName].timeStart, yAlign: dateDB[hour][activeRoom][uName].yAlign, region: reg
                 });
             }
 
@@ -638,20 +740,23 @@
 
         function refreshWatchGridUI() {
             const gridContainer = document.getElementById("watchQuadGrid");
-            if(!gridContainer) return;
-            gridContainer.innerHTML = "";
+            if(!gridContainer) return; gridContainer.innerHTML = "";
+
+            const watchRoom = document.getElementById("watchRoomSelect").value;
+            if(!watchRoom) return;
 
             const hour = document.getElementById("watchHourSelect").value;
             const dateDB = getActiveDateDB();
-            const userList = GetRoomUserList(hour);
+            const userList = GetRoomUserList(hour, watchRoom);
+            const activePlaceholder = roomEmptySettings[watchRoom] || "💤";
 
             for(let i=0; i<4; i++) {
                 const user = userList[i];
                 const cell = document.createElement("div");
                 cell.className = "grid-cell";
 
-                if(user && dateDB[hour] && dateDB[hour][user] && dateDB[hour][user].text) {
-                    const uData = dateDB[hour][user];
+                if(user && dateDB[hour] && dateDB[hour][watchRoom] && dateDB[hour][watchRoom][user] && dateDB[hour][watchRoom][user].text) {
+                    const uData = dateDB[hour][watchRoom][user];
                     cell.innerHTML = `
                         <div class="cell-overlay-time-box">
                             <div class="cell-time-title">${hour}</div>
@@ -664,11 +769,10 @@
                         <video class="grid-cell-video" loop autoplay muted playsinline src="${uData.video}" style="object-position: center ${uData.yAlign}%;"></video>
                     `;
                 } else {
-                    // 💥 帶入連線同步後的預設符號變數
                     cell.innerHTML = `
                         <div class="cell-empty-placeholder">
                             <div class="cell-empty-time">${hour}</div>
-                            <span style="font-size:24px;">${globalEmptyPlaceholder}</span>
+                            <span style="font-size:24px;">${activePlaceholder}</span>
                         </div>
                     `;
                 }
@@ -677,17 +781,13 @@
         }
 
         function saveProfileAndJoin() {
-            const rCode = document.getElementById("roomCode").value;
             const uName = document.getElementById("userName").value || "未命名";
             const reg = document.getElementById("userRegion").value;
             localStorage.setItem("mini2s_userName", uName);
-            localStorage.setItem("mini2s_roomCode", rCode);
             localStorage.setItem("mini2s_userRegion", reg);
             
-            renderRoomMembersUI([]); 
-            
-            if(socket && socket.connected) {
-                socket.emit('join-room-with-profile', { roomCode: rCode, userName: uName, avatar: userAvatarBase64 });
+            if(socket && socket.connected && myRoomList.length > 0) {
+                socket.emit('join-multiple-rooms', { rooms: myRoomList, userName: uName, avatar: userAvatarBase64 });
             }
         }
 
@@ -699,14 +799,20 @@
             if (activeTabId === "nav5") renderManagementPageUI();
         }
         
-        function syncInputText() { const hour = document.getElementById('currentHour').value; const uName = document.getElementById("userName").value || "未命名"; const dateDB = getActiveDateDB(); document.getElementById('statusText').value = (dateDB[hour] && dateDB[hour][uName]) ? dateDB[hour][uName].text : ""; }
+        function syncInputText() { 
+            const hour = document.getElementById('currentHour').value; 
+            const uName = document.getElementById("userName").value || "未命名"; 
+            const activeRoom = document.getElementById("activeRoomSelect").value;
+            const dateDB = getActiveDateDB(); 
+            document.getElementById('statusText').value = (dateDB[hour] && dateDB[hour][activeRoom] && dateDB[hour][activeRoom][uName]) ? dateDB[hour][activeRoom][uName].text : ""; 
+        }
 
         function switchTab(tabIndex) { 
             document.querySelectorAll('.tab-content').forEach(p => p.classList.remove('active')); 
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active')); 
             document.querySelectorAll('.tab-content')[tabIndex].classList.add('active'); 
             document.querySelectorAll('.nav-item')[tabIndex].classList.add('active'); 
-            if(tabIndex === 1) updateLivePublishGrid();
+            if(tabIndex === 1) handleActiveRoomToggle();
             if(tabIndex === 2) refreshWatchGridUI(); 
             if(tabIndex === 4) renderManagementPageUI(); 
         }
@@ -716,114 +822,92 @@
             const outputArea = document.getElementById('megaOutputArea'); 
             const dateDB = getActiveDateDB();
             const myCurrentName = document.getElementById("userName").value || "未命名";
+            const rCode = document.getElementById("renderRoomSelect").value;
 
-            let activeHours = Object.keys(dateDB).filter(h => Object.keys(dateDB[h]).some(u => dateDB[h][u] && dateDB[h][u].video)).sort();
+            if(!rCode) return alert("請選擇要生成的房間！");
+            const activePlaceholder = roomEmptySettings[rCode] || "💤";
+
+            let activeHours = Object.keys(dateDB).filter(h => dateDB[h][rCode] && Object.keys(dateDB[h][rCode]).some(u => dateDB[h][rCode][u] && dateDB[h][rCode][u].video)).sort();
             
             if(activeHours.length === 0) { 
-                outputArea.innerHTML = "<p style='color:#2f3542;font-weight:bold;'>❌ 今天還沒有任何人上傳動態，無法生成 24H 大片唷！</p>"; 
-                return; 
+                outputArea.innerHTML = "<p style='color:#2f3542;font-weight:bold;'>❌ 此房間今天沒有任何人上傳動態！</p>"; return; 
             }
 
             outputArea.innerHTML = `<p style='color:#747d8c; font-weight:bold;'>生成中</p>`;
-
             const stream = canvas.captureStream(24);
             const recorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
             let chunks = []; recorder.ondataavailable = (e) => chunks.push(e.data);
             recorder.onstop = () => {
                 const blob = new Blob(chunks, { type: 'video/mp4' }); const url = URL.createObjectURL(blob);
                 outputArea.innerHTML = `
-                    <p style="color:#2ed573; font-weight:bold;">🎉 24H 終極連線大片生成成功！</p>
+                    <p style="color:#2ed573; font-weight:bold;">🎉 24H 終極大片生成成功！</p>
                     <video src="${url}" controls autoplay style="width:100%; max-width:320px; border-radius:12px; margin-top:10px;"></video>
-                    <a href="${url}" download="Diary_24H_FullDay.mp4" style="color:#2f3542; text-decoration:none; font-weight:bold; display:block; margin-top:8px;">📥 下載全天 24H 影片 MP4</a>`;
+                    <a href="${url}" download="Diary_24H_Room_${rCode}.mp4" style="color:#2f3542; text-decoration:none; font-weight:bold; display:block; margin-top:8px;">📥 下載 MP4</a>`;
             };
             recorder.start();
 
             const userSet = new Set([myCurrentName]);
-            activeHours.forEach(h => Object.keys(dateDB[h]).forEach(u => userSet.add(u)));
+            activeHours.forEach(h => { if(dateDB[h][rCode]) Object.keys(dateDB[h][rCode]).forEach(u => userSet.add(u)); });
             const userList = Array.from(userSet).slice(0, 4);
 
             const loadedAvatars = {};
             for (let u of userList) {
                 let src = "data:image/svg+xml;utf8,<svg viewBox='0 0 24 24' fill='%23a4b0be'><path d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z'/></svg>";
-                for (let h of activeHours) { if (dateDB[h] && dateDB[h][u] && dateDB[h][u].avatar) { src = dateDB[h][u].avatar; break; } }
+                for (let h of activeHours) { if (dateDB[h] && dateDB[h][rCode] && dateDB[h][rCode][u] && dateDB[h][rCode][u].avatar) { src = dateDB[h][rCode][u].avatar; break; } }
                 const img = new Image(); img.src = src; await new Promise(r => img.onload = r); loadedAvatars[u] = img;
             }
 
-            const cellW = canvas.width / 2;
-            const cellH = canvas.height / 2;
+            const cellW = canvas.width / 2; const cellH = canvas.height / 2;
             const gridCoords = [{ x: 0, y: 0 }, { x: cellW, y: 0 }, { x: 0, y: cellH }, { x: cellW, y: cellH }];
 
             for (let h of activeHours) {
                 const vElements = {};
                 for (let u of userList) {
-                    if (dateDB[h] && dateDB[h][u] && dateDB[h][u].video) {
-                        const v = document.createElement('video'); v.src = dateDB[h][u].video; v.muted = true; v.playsInline = true;
-                        v.currentTime = dateDB[h][u].timeStart || 0; v.play(); vElements[u] = v;
+                    if (dateDB[h] && dateDB[h][rCode] && dateDB[h][rCode][u] && dateDB[h][rCode][u].video) {
+                        const v = document.createElement('video'); v.src = dateDB[h][rCode][u].video; v.muted = true; v.playsInline = true;
+                        v.currentTime = dateDB[h][rCode][u].timeStart || 0; v.play(); vElements[u] = v;
                     }
                 }
 
                 let startRun = Date.now();
                 while (Date.now() - startRun < 2000) {
                     ctx.fillStyle = '#1e1e1e'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-
                     for (let i = 0; i < 4; i++) {
                         const u = userList[i]; if (!u) continue;
                         const coord = gridCoords[i];
-                        const uData = dateDB[h] ? dateDB[h][u] : null;
+                        const uData = (dateDB[h] && dateDB[h][rCode]) ? dateDB[h][rCode][u] : null;
 
-                        ctx.save();
-                        ctx.beginPath(); ctx.rect(coord.x, coord.y, cellW, cellH); ctx.clip();
+                        ctx.save(); ctx.beginPath(); ctx.rect(coord.x, coord.y, cellW, cellH); ctx.clip();
 
                         if (uData && uData.video && vElements[u] && vElements[u].videoWidth > 0) {
                             const video = vElements[u];
-                            
-                            let vWidth = video.videoWidth;
-                            let vHeight = video.videoHeight;
-                            let scale = Math.max(cellW / vWidth, cellH / vHeight);
-                            let drawW = vWidth * scale;
-                            let drawH = vHeight * scale;
-                            
+                            let scale = Math.max(cellW / video.videoWidth, cellH / video.videoHeight);
+                            let drawW = video.videoWidth * scale; let drawH = video.videoHeight * scale;
                             let drawX = coord.x + (cellW - drawW) / 2;
-                            let yPercent = (uData.yAlign || 50) / 100;
-                            let drawY = coord.y + (cellH - drawH) * yPercent;
+                            let drawY = coord.y + (cellH - drawH) * ((uData.yAlign || 50) / 100);
                             
                             ctx.drawImage(video, drawX, drawY, drawW, drawH);
-                            
                             ctx.fillStyle = "rgba(0, 0, 0, 0.12)"; ctx.fillRect(coord.x, coord.y, cellW, cellH);
-                            ctx.fillStyle = "#ffffff"; ctx.textAlign = "center";
-                            ctx.shadowColor = "rgba(0,0,0,0.6)"; ctx.shadowBlur = 8;
-                            
-                            ctx.font = "800 32px 'Lexend', sans-serif";
-                            ctx.fillText(h, coord.x + cellW / 2, coord.y + (cellH / 2) - 10);
-                            
-                            ctx.font = "bold 20px sans-serif";
-                            ctx.fillText(uData.text, coord.x + cellW / 2, coord.y + (cellH / 2) + 30);
+                            ctx.fillStyle = "#ffffff"; ctx.textAlign = "center"; ctx.shadowColor = "rgba(0,0,0,0.6)"; ctx.shadowBlur = 8;
+                            ctx.font = "800 32px 'Lexend', sans-serif"; ctx.fillText(h, coord.x + cellW / 2, coord.y + (cellH / 2) - 10);
+                            ctx.font = "bold 20px sans-serif"; ctx.fillText(uData.text, coord.x + cellW / 2, coord.y + (cellH / 2) + 30);
                             ctx.shadowBlur = 0;
 
                             const regionDisplay = uData.region || "";
                             const bx = coord.x + 12; const by = coord.y + 12;
-                            
-                            ctx.fillStyle = "rgba(0, 0, 0, 0.3)";
-                            ctx.beginPath(); ctx.roundRect(bx, by, 125, 26, 13); ctx.fill();
+                            ctx.fillStyle = "rgba(0, 0, 0, 0.3)"; ctx.beginPath(); ctx.roundRect(bx, by, 125, 26, 13); ctx.fill();
 
                             if (loadedAvatars[u]) {
-                                ctx.save();
-                                ctx.beginPath(); ctx.arc(bx + 13, by + 13, 9, 0, Math.PI * 2); ctx.clip();
-                                ctx.drawImage(loadedAvatars[u], bx + 4, by + 4, 18, 18);
-                                ctx.restore();
+                                ctx.save(); ctx.beginPath(); ctx.arc(bx + 13, by + 13, 9, 0, Math.PI * 2); ctx.clip();
+                                ctx.drawImage(loadedAvatars[u], bx + 4, by + 4, 18, 18); ctx.restore();
                             }
-                            ctx.fillStyle = "#ffffff"; ctx.textAlign = "left";
-                            ctx.font = "bold 11px sans-serif";
+                            ctx.fillStyle = "#ffffff"; ctx.textAlign = "left"; ctx.font = "bold 11px sans-serif";
                             ctx.fillText(`${u} ${regionDisplay.substring(0,6)}`, bx + 28, by + 17);
-
                         } else {
                             ctx.fillStyle = '#121212'; ctx.fillRect(coord.x, coord.y, cellW, cellH);
-                            ctx.fillStyle = 'rgba(255,255,255,0.2)';
-                            ctx.textAlign = "center";
+                            ctx.fillStyle = 'rgba(255,255,255,0.2)'; ctx.textAlign = "center";
                             ctx.font = "800 30px 'Lexend', sans-serif"; ctx.fillText(h, coord.x + cellW / 2, coord.y + (cellH / 2) - 15);
-                            
-                            // 💥 生成全天大片時，未上傳格子也完美改用連線自訂狀態文字
-                            ctx.font = "30px sans-serif"; ctx.fillText(globalEmptyPlaceholder, coord.x + cellW / 2, coord.y + (cellH / 2) + 25);
+                            ctx.font = "30px sans-serif"; ctx.fillText(activePlaceholder, coord.x + cellW / 2, coord.y + (cellH / 2) + 25);
                         }
                         ctx.restore();
                     }
@@ -834,7 +918,8 @@
             recorder.stop();
         }
     </script>
-    </body>
+</body>
 </html>
+        
 </body>
 </html>
